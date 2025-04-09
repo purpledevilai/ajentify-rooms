@@ -1,0 +1,131 @@
+Ajentify rooms app
+Made with chakra ui 
+State using mobx
+
+I would like you to help me built the front end to my webRTC video chat app. This app will have all the basic functionality that you would typically expect out of a web chat app; connect to rooms, mute and change your video and audio, and end the call. 
+
+The backend websocket signaling server has been set up so it's just the front end that needs connect to it.
+
+Messaging with the server will use a JSON-RPC style with websocket server. The protocol being, you can send a request or a response message designated by the type field. A response message is of course in response to a request message from the server if the request had an id specified in the message. Otherwise it is assumed the sender does not need a response.
+
+Requests sent from the front end should follow a similar pattern. If the request is expecting a response, specify an id on the request. Then to await the response, add the id of the request to a dictionary with it's value as null. Do a while request_responses[request_id] === undefined loop to wait for the response. When we do receive the response message back in the websocket message callback, we can it to the request_responses dictionary based on the request_id that it will send back in the response.
+
+Request format
+{
+    "id": "optional_id_for_the_request",
+    "type": "request",
+    "method": "function_to_call",
+    "params": {
+        "param1": "param1",
+        "param2": "param2"
+    }
+}
+
+Response format
+{
+    "request_id": "id_of_the_request"
+    "data": {
+        "key1": "value1",
+        "key2": "value2"
+    } 
+}
+
+This app will use a MobX store to manage it's state. Here is the pseudo code definition below. Please create the implemented code for this file.
+
+./stores/roomstore.ts
+Room Store 
+- room id
+- is_connecting
+- request_responses
+- websocket
+- peer_connections
+- connection_state
+- media_stream
+- enumerated video devices (for listing)
+- enumerated audio devices (for listing)
+
+- send_request(method, params, await_response = false)
+    - construct request object
+    - if await response add request id to request_responses 
+    - send request object via the websocket
+    - if awaiting response do while loop, checking request_responses for data
+    - return the data
+
+- send_response(request_id, data)
+    - construct the response object
+    - send the response object via the websocket
+
+- connect_to_the_websocket_server
+    - set is connecting to true
+    - connect to websocket server using env variable
+    - set websocket
+    - set it's onMessage listener
+        - parse the message as JSON
+        - check for request or response
+        - if request call the method in the method field of the request
+        - if response set the data of the response on the request_responses dictionary
+    - set is connectiong to false
+
+- create_peer_connection_and_offer(reference_id, request_id) // method that can be invoked by the server
+    - create an RTCPeerConnection
+    - the a peer connection objet that being {connection, tracks} tracks being media stream tracks and they will be empty initially of corse
+    - set the peer connection object on the peer_connections dictionary with the reference_id as the key and the peer connection object as the value
+    - Add listeners for ice candidates
+        - send ice candidate to the server in a request, also specify the reference_id in the request, no response needed 
+    - Add listener for track change events
+        - set the tracks object in the peer_connections dictionary using the reference_id to get the peer connection object
+    - Add connection state changes
+        - set the connection state variable
+    - adds tracks to RTCPeerConnection from media_stream variable set
+    - create the local offer
+    - set it as the local description
+    - send response with the offer and the request id
+
+- create_peer_connection_and_answer(reference_id, offer, request_id) // another method that can be invoked by the server
+    - creates RCPeerConnection (pc)
+    - Add listeners for ice candidates
+        - send ice candidate to the server in a request, also specify the reference_id in the request, no response needed 
+    - Add listener for track change events
+        - set the tracks object in the peer_connections dictionary using the reference_id to get the peer connection object
+    - Add connection state changes
+        - set the connection state variable
+    - adds tracks to RTCPeerConnection from media_stream variable set
+    - sets remote description with offer
+    - create the answer
+    - send response with the answer and request id
+
+- connect_to_room(room_id)
+    - call connect to websocket server 
+    - send a request with "join_room" as the method and the room id as a param
+
+- update_media_stream(media_stream):
+    - sets the current media stream
+    - loop through each of the peer connection's (if any) rtc peer connection and updates the tracks
+
+- leave_room()
+    - send a request to "leave_room"
+
+expose the store as roomStore
+
+
+Now on to the views!
+Assume a mobile first design! All designs should be designed only for mobile views. 
+
+This app, for now will only have two routes, a set_room_id route and a room route. If the room page has a room_id specified in the url, ie https://rooms.ajentify.com/room/{room_id}  imediately route to the room page. Otherwise route to the "Set room id" page. Please create the route file for this react app.
+
+./pages/set_room_id.ts
+This should just be a simple page with a centered input field where the user can type the room_id, and a join button below. At that point the user will be routed to the room page with the specified room_id. Please create this file.
+
+
+./pages/room.ts
+This page should initialize by first asking for the users permissions for video and microphone if they are not already allowed. Then it should automatically select the default audio and video from the roomState.
+
+This page is the classic chat application. So at the top will be a control bar where the user can see the room_id and buttons to toggle the mute on their audio and video. Next to their respective buttons should be dropdown buttons where the user can select from their available video or audio devices. Selected and available audio devices should be reflective of what is set in the roomStore mobx state. And lastly there should be a leave room button which calls the leave room function in the roomStore and routes back to the set room id page.
+
+For the main view below the control bar display the videos of the peer_connections. Map the video views in a simple column having the height of the views expand equally to fill the available height. 
+
+Please create the room page file fore me as well.
+
+
+So in all please create a working typescript react application with the following file as described above. Use your expert abilities as a developer and front end developer to make sure the functionality works and the code is clean. Use your ui skills to implement chakra components. Of course use your best judgement to implement the logic in order for the app to work.
+
