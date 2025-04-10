@@ -5,11 +5,11 @@ import {
     Box,
     Flex,
     Text,
-    Button,
-    Dialog,
-    Portal,
-    CloseButton,
+    IconButton,
+    useColorMode,
+    useColorModeValue,
 } from "@chakra-ui/react";
+import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 import { roomStore } from "../stores/roomstore";
 
 const Room = observer(() => {
@@ -17,14 +17,11 @@ const Room = observer(() => {
     const navigate = useNavigate();
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const peerRefs = useRef<Record<string, HTMLVideoElement>>({});
+    const { colorMode, toggleColorMode } = useColorMode();
 
-    const handleLeave = () => {
-        roomStore.leaveRoom();
-        if (localVideoRef.current) {
-            localVideoRef.current.srcObject = null; // Clear the camera stream from the video element
-        }
-        navigate("/set-room-id");
-    };
+    const bg = useColorModeValue("gray.100", "gray.900");
+    const text = useColorModeValue("gray.800", "white");
+    const controlBarBg = useColorModeValue("rgba(255,255,255,0.8)", "rgba(0,0,0,0.7)");
 
     useEffect(() => {
         if (!roomId) {
@@ -49,70 +46,116 @@ const Room = observer(() => {
         });
     }, [roomStore.peerConnections]);
 
-    return (
-        <Box position="relative" height="100vh">
-            {/* Leave Dialog */}
-            <Box position="absolute" top="1rem" right="1rem">
-                <Dialog.Root>
-                    <Dialog.Trigger asChild>
-                        <Button colorScheme="red">Leave</Button>
-                    </Dialog.Trigger>
-                    <Portal>
-                        <Dialog.Backdrop />
-                        <Dialog.Positioner>
-                            <Dialog.Content>
-                                <Dialog.Header>
-                                    <Dialog.Title>Leave Room</Dialog.Title>
-                                </Dialog.Header>
-                                <Dialog.Body>
-                                    <Text>Are you sure you want to leave the room?</Text>
-                                </Dialog.Body>
-                                <Dialog.Footer>
-                                    <Dialog.ActionTrigger asChild>
-                                        <Button variant="outline">Cancel</Button>
-                                    </Dialog.ActionTrigger>
-                                    <Button colorScheme="red" ml={3} onClick={handleLeave}>
-                                        Leave
-                                    </Button>
-                                </Dialog.Footer>
-                                <Dialog.CloseTrigger asChild>
-                                    <CloseButton position="absolute" top="1rem" right="1rem" />
-                                </Dialog.CloseTrigger>
-                            </Dialog.Content>
-                        </Dialog.Positioner>
-                    </Portal>
-                </Dialog.Root>
-            </Box>
+    const handleLeave = () => {
+        roomStore.leaveRoom();
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = null;
+        }
+        navigate("/set-room-id");
+    };
 
-            <Flex direction="column" align="center" justify="center" height="100%" p={4}>
-                <Text mb={4}>This is the room {roomId}</Text>
+    return (
+        <Box position="relative" height="100vh" width="100vw" overflow="hidden" bg={bg} color={text}>
+            {/* Color Mode Toggle (Top-Right Overlay) */}
+            <IconButton
+                icon={colorMode === "light" ? <MoonIcon /> : <SunIcon />}
+                aria-label="Toggle color mode"
+                onClick={toggleColorMode}
+                position="absolute"
+                top="16px"
+                left="16px" // Adjusted to not overlap local video
+                zIndex={3}
+                variant="ghost"
+            />
+
+            {/* Local Video (Top-Right Overlay) */}
+            <Box
+                position="absolute"
+                top="16px"
+                right="16px"
+                width="200px"
+                height="120px"
+                zIndex={2}
+                borderRadius="md"
+                overflow="hidden"
+                boxShadow="lg"
+                bg="black"
+            >
                 <video
                     ref={localVideoRef}
                     autoPlay
                     playsInline
-                    controls={false}
                     muted
                     style={{
                         width: "100%",
-                        height: "auto",
-                        borderRadius: "8px",
+                        height: "100%",
+                        objectFit: "cover",
                         transform: "scaleX(-1)",
                     }}
                 />
+            </Box>
+
+            {/* Peer Videos Scroll Area (Centered Main View) */}
+            <Flex
+                direction="column"
+                align="center"
+                justify="start"
+                height="100%"
+                px={4}
+                pt="160px"
+                pb="80px"
+                overflowY="auto"
+                position="relative"
+                zIndex={1}
+            >
+                <Text fontSize="lg" mb={4}>Room ID: {roomId}</Text>
+
                 {Object.entries(roomStore.peerConnections).map(([id]) => (
-                    <Box key={id} mb={4}>
-                        <Box mb={1}>Peer: {id}</Box>
-                        <video
-                            ref={(el) => {
-                                if (el) peerRefs.current[id] = el;
-                            }}
-                            autoPlay
-                            playsInline
-                            style={{ width: "100%", height: "auto", borderRadius: "8px" }}
-                        />
+                    <Box key={id} mb={6} width="100%" maxW="600px">
+                        <Box borderRadius="md" overflow="hidden" boxShadow="md" bg="black">
+                            <video
+                                ref={(el) => {
+                                    if (el) peerRefs.current[id] = el;
+                                }}
+                                autoPlay
+                                playsInline
+                                style={{
+                                    width: "100%",
+                                    height: "auto",
+                                    objectFit: "cover",
+                                    borderRadius: "8px",
+                                }}
+                            />
+                        </Box>
                     </Box>
                 ))}
             </Flex>
+
+            {/* Control Bar (Bottom Overlay) */}
+            <Box
+                position="absolute"
+                bottom="0"
+                width="100%"
+                bg={controlBarBg}
+                backdropFilter="blur(6px)"
+                py={3}
+                px={4}
+                zIndex={2}
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+            >
+                {/* <Text fontSize="sm">Controls will go here</Text> */}
+                <Text
+                    as="button"
+                    onClick={handleLeave}
+                    color="red.400"
+                    _hover={{ color: "red.600" }}
+                    fontWeight="bold"
+                >
+                    Leave Call
+                </Text>
+            </Box>
         </Box>
     );
 });
