@@ -19,6 +19,7 @@ function SetRoomId() {
       align="center"
       justify="center"
       height="100vh"
+      width="100vw"
       p={4}
     >
       <Heading mb={6}>Enter a Room ID</Heading>

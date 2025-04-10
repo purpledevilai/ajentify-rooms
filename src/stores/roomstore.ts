@@ -97,7 +97,7 @@ export class RoomStore {
             this.isConnecting = true;
         });
 
-        const WS_URL = "ws://localhost:8080/ws";
+        const WS_URL = "wss://room-signaling-server.prod.rooms.ajentify.com/ws";
 
         this.websocket = new WebSocket(WS_URL);
 
