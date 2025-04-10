@@ -99,7 +99,7 @@ const Room = observer(() => {
                         transform: "scaleX(-1)",
                     }}
                 />
-                {Object.entries(roomStore.peerConnections).map(([id, pcData]) => (
+                {Object.entries(roomStore.peerConnections).map(([id]) => (
                     <Box key={id} mb={4}>
                         <Box mb={1}>Peer: {id}</Box>
                         <video

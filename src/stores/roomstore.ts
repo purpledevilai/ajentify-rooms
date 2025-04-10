@@ -1,4 +1,4 @@
-import { makeAutoObservable, runInAction, reaction } from "mobx";
+import { makeAutoObservable, runInAction } from "mobx";
 
 /**
  * Type for tracking peer connection objects in the store.
@@ -14,6 +14,7 @@ export class RoomStore {
     roomId: string | undefined = undefined;
     isConnecting = false;
 
+    // eslint-disable-next-line
     requestResponses: Record<string, any> = {};
 
     websocket: WebSocket | null = null;
@@ -354,8 +355,10 @@ export class RoomStore {
      */
     sendRequest(
         method: string,
+        // eslint-disable-next-line
         params: Record<string, any> = {},
         await_response = false
+        // eslint-disable-next-line
     ): Promise<any> {
         return new Promise((resolve) => {
             if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
@@ -366,6 +369,7 @@ export class RoomStore {
 
             // Construct request object
             const requestId: string | undefined = await_response ? this.generateUniqueId() : undefined;
+            // eslint-disable-next-line
             const request: { id: string | undefined; type: string; method: string; params: Record<string, any> } = {
                 id: requestId,
                 type: "request",
@@ -409,6 +413,7 @@ export class RoomStore {
     /**
      * Helper to send a response back to the signaling server
      */
+    // eslint-disable-next-line
     sendResponse(request_id: string, data: Record<string, any>) {
         if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
             console.warn("WebSocket is not open. Cannot send response.");
