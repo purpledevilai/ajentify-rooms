@@ -122,6 +122,11 @@ export class RoomStore {
 
         this.websocket.onclose = () => {
             console.log("WebSocket closed");
+            // Clean up peer connections
+            for (const key in this.peerConnections) {
+                const pcData = this.peerConnections[key];
+                pcData.connection.close();
+            }
             runInAction(() => {
                 this.isConnecting = false;
             });
@@ -184,7 +189,7 @@ export class RoomStore {
                 { urls: "stun:stun.l.google.com:19302" }
             ]
         });
-        
+
         this.peerConnections[referenceId] = { connection: pc, tracks: [] };
         console.log("SET PEER CONNECTION!!!", JSON.stringify(this.peerConnections));
 
@@ -205,19 +210,19 @@ export class RoomStore {
         // On Track
         pc.ontrack = (event) => {
             console.log("Track event:", event);
-        
+
             const pcData = this.peerConnections[referenceId];
-        
+
             // If it's the first track, create a new MediaStream
             if (!pcData.mediaStream) {
                 pcData.mediaStream = new MediaStream();
             }
-        
+
             // Add the incoming track to the peer's MediaStream
             event.streams[0].getTracks().forEach((track) => {
                 pcData.mediaStream?.addTrack(track);
             });
-        
+
             // Trigger MobX update (we’re mutating deep object, so force a rerender)
             runInAction(() => {
                 this.peerConnections = { ...this.peerConnections };
@@ -227,6 +232,12 @@ export class RoomStore {
         // On Connection State Change
         pc.onconnectionstatechange = () => {
             console.log("Connection state changed:", pc.connectionState);
+            // Check if connection is closed
+            if (pc.connectionState === "disconnected" || pc.connectionState === "closed") {
+                console.log("Peer connection closed");
+                console.log("Deleting peer connection from store");
+                delete this.peerConnections[referenceId];
+            }
         }
 
         // Add local tracks from our media stream
@@ -318,9 +329,7 @@ export class RoomStore {
     /**
      * Send a request to leave the room
      */
-    leave_room() {
-        this.sendRequest("leave_room", {}, false);
-
+    leaveRoom() {
         // Clean up local data
         Object.keys(this.peerConnections).forEach((key) => {
             const pcData = this.peerConnections[key];
@@ -328,6 +337,9 @@ export class RoomStore {
             delete this.peerConnections[key];
         });
         this.websocket?.close();
+        this.mediaStream?.getVideoTracks().forEach((track) => track.stop());
+        this.mediaStream?.getAudioTracks().forEach((track) => track.stop());
+        this.mediaStream?.getTracks().forEach((track) => track.stop());
         runInAction(() => {
             this.connectionState = undefined;
             this.mediaStream = undefined;
