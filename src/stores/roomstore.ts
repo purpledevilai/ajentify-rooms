@@ -27,6 +27,9 @@ export class RoomStore {
     audioDevices: MediaDeviceInfo[] = [];
     selectedVideoDevice: MediaDeviceInfo | undefined = undefined;
     selectedAudioDevice: MediaDeviceInfo | undefined = undefined;
+    
+    audioMuted = false;
+    videoMuted = false;
 
 
     constructor() {
@@ -38,14 +41,14 @@ export class RoomStore {
      */
     async initializeAndConnect(roomId: string) {
         this.roomId = roomId;
-        await this.initializeMediaDevices();
+        await this.initializeMediaStream();
         this.connectToServer();
     }
 
     /**
      * Initialize the media devices and set the default devices.
      */
-    async initializeMediaDevices() {
+    async initializeMediaStream() {
         // Prompt for both video and audio
         await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
@@ -60,30 +63,123 @@ export class RoomStore {
         this.selectedVideoDevice = this.videoDevices[0];
         this.selectedAudioDevice = this.audioDevices[0];
 
-        await this.refreshMediaStream();
-    }
-
-    /**
-     * Refresh the media stream with the currently selected devices.
-     * This is called when the user changes their audio/video settings.
-     */
-    async refreshMediaStream() {
-        // If user has turned off video, we won't request it
+        // Set up media constraints
         const videoConstraints = this.selectedVideoDevice
             ? { deviceId: this.selectedVideoDevice.deviceId }
             : false;
-
-        // If user has turned off audio, we won't request it
         const audioConstraints = this.selectedAudioDevice
             ? { deviceId: this.selectedAudioDevice.deviceId }
             : false;
 
-        const newStream = await navigator.mediaDevices.getUserMedia({
+        // Set the media stream
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
             video: videoConstraints,
             audio: audioConstraints,
         });
+    }
 
-        this.mediaStream = newStream;
+    /**
+     * Toggle audio device mute
+     */
+    toggleAudioDeviceMute() {
+        if (this.mediaStream) {
+            const [audioTrack] = this.mediaStream.getAudioTracks()
+            audioTrack.enabled = !audioTrack.enabled
+            this.audioMuted = !this.audioMuted
+        }
+    }
+
+    /**
+     * Set Audio Device by Id
+     */
+    async setAudioDevice(deviceId: string) {
+        const device = this.audioDevices.find((d) => d.deviceId === deviceId);
+        if (!device || !this.mediaStream) return;
+
+        const mediaStreamWithAudioTrack = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId },
+            video: false,
+        });
+
+        const [newAudioTrack] = mediaStreamWithAudioTrack.getAudioTracks();
+        const [oldAudioTrack] = this.mediaStream.getAudioTracks();
+
+        this.mediaStream.removeTrack(oldAudioTrack);
+        oldAudioTrack.stop();
+
+        this.mediaStream.addTrack(newAudioTrack);
+
+        for (const pcData of Object.values(this.peerConnections)) {
+            const sender = pcData.connection.getSenders().find(
+                (s) => s.track?.kind === newAudioTrack.kind
+            );
+
+            if (sender) {
+                await sender.replaceTrack(newAudioTrack);
+            }
+        }
+
+        // Clean up unused tracks from temporary stream
+        mediaStreamWithAudioTrack.getTracks().forEach((track) => {
+            if (track !== newAudioTrack) track.stop();
+        });
+
+        this.selectedAudioDevice = device;
+    }
+
+    /**
+     * Toggle video device mute
+     */
+    toggleVideoDeviceMute() {
+        if (this.mediaStream) {
+            const [videoTrack] = this.mediaStream.getVideoTracks();
+            videoTrack.enabled = !videoTrack.enabled;
+            this.videoMuted = !this.videoMuted;
+        }
+    }
+
+    /**
+     * Set Video Device by Id
+     */
+    async setVideoDevice(deviceId: string) {
+        // Verify device id is valid
+        const device = this.videoDevices.find((d) => d.deviceId === deviceId);
+        if (!device || !this.mediaStream) return;
+
+        // Get the stream with the new video track
+        const mediaStreamWithVideoTrack = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId },
+            audio: false,
+        });
+
+        const [newVideoTrack] = mediaStreamWithVideoTrack.getVideoTracks();
+        const [oldVideoTrack] = this.mediaStream.getVideoTracks();
+
+        // Remove and stop the old track
+        this.mediaStream.removeTrack(oldVideoTrack);
+        oldVideoTrack.stop();
+
+        // Add the new track to the existing MediaStream
+        this.mediaStream.addTrack(newVideoTrack);
+
+        // Replace the video track in each peer connection
+        for (const pcData of Object.values(this.peerConnections)) {
+            const sender = pcData.connection.getSenders().find(
+                (s) => s.track?.kind === newVideoTrack.kind
+            );
+
+            if (sender) {
+                await sender.replaceTrack(newVideoTrack);
+            }
+        }
+
+        // Clean up other tracks in the temporary stream
+        mediaStreamWithVideoTrack.getTracks().forEach((track) => {
+            if (track !== newVideoTrack) track.stop();
+        });
+
+        // Store the selected video device
+        this.selectedVideoDevice = device;
     }
 
     /**
@@ -214,17 +310,10 @@ export class RoomStore {
 
             const pcData = this.peerConnections[referenceId];
 
-            // If it's the first track, create a new MediaStream
-            if (!pcData.mediaStream) {
-                pcData.mediaStream = new MediaStream();
-            }
+            const [newStream] = event.streams;
+            pcData.mediaStream = newStream;
 
-            // Add the incoming track to the peer's MediaStream
-            event.streams[0].getTracks().forEach((track) => {
-                pcData.mediaStream?.addTrack(track);
-            });
-
-            // Trigger MobX update (we’re mutating deep object, so force a rerender)
+            // Trigger MobX update
             runInAction(() => {
                 this.peerConnections = { ...this.peerConnections };
             });
@@ -304,27 +393,6 @@ export class RoomStore {
             return;
         }
         pcData.connection.addIceCandidate(candidate);
-    }
-
-    /**
-     * Update the store's active MediaStream and ensure that
-     * any existing RTCPeerConnections also update to use these tracks.
-     */
-    update_media_stream(mediaStream: MediaStream) {
-        runInAction(() => {
-            this.mediaStream = mediaStream;
-        });
-
-        Object.keys(this.peerConnections).forEach((key) => {
-            const pcData = this.peerConnections[key];
-            const senders = pcData.connection.getSenders();
-            senders.forEach((sender) => {
-                pcData.connection.removeTrack(sender);
-            });
-            mediaStream.getTracks().forEach((track) => {
-                pcData.connection.addTrack(track, mediaStream);
-            });
-        });
     }
 
     /**

@@ -8,9 +8,13 @@ import {
     IconButton,
     useColorMode,
     useColorModeValue,
+    HStack,
+    Select,
+    Tooltip,
 } from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 import { roomStore } from "../stores/roomstore";
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-icons/fa";
 
 const Room = observer(() => {
     const { roomId } = useParams();
@@ -103,7 +107,7 @@ const Room = observer(() => {
                 height="100%"
                 px={4}
                 pt="160px"
-                pb="80px"
+                pb="160px"
                 overflowY="auto"
                 position="relative"
                 zIndex={1}
@@ -141,20 +145,64 @@ const Room = observer(() => {
                 py={3}
                 px={4}
                 zIndex={2}
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
             >
-                {/* <Text fontSize="sm">Controls will go here</Text> */}
-                <Text
-                    as="button"
-                    onClick={handleLeave}
-                    color="red.400"
-                    _hover={{ color: "red.600" }}
-                    fontWeight="bold"
-                >
-                    Leave Call
-                </Text>
+                <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
+                    {/* Audio Controls */}
+                    <HStack spacing={2}>
+                        <Tooltip label="Mute / Unmute Microphone">
+                            <IconButton
+                                aria-label="Toggle Mute Audio"
+                                icon={roomStore.audioMuted ? <FaMicrophoneSlash /> : <FaMicrophone /> }
+                                onClick={() => roomStore.toggleAudioDeviceMute()}
+                            />
+                        </Tooltip>
+                        <Select
+                            placeholder="Select Microphone"
+                            value={roomStore.selectedAudioDevice?.deviceId ?? ""}
+                            onChange={(e) => roomStore.setAudioDevice(e.target.value)}
+                            maxW="200px"
+                        >
+                            {roomStore.audioDevices.map((device) => (
+                                <option key={device.deviceId} value={device.deviceId}>
+                                    {device.label || `Mic ${device.deviceId.slice(-4)}`}
+                                </option>
+                            ))}
+                        </Select>
+                    </HStack>
+
+                    {/* Video Controls */}
+                    <HStack spacing={2}>
+                        <Tooltip label="Toggle Camera">
+                            <IconButton
+                                aria-label="Toggle Mute Video"
+                                icon={roomStore.videoMuted ? <FaVideoSlash /> : <FaVideo />}
+                                onClick={() => roomStore.toggleVideoDeviceMute()}
+                            />
+                        </Tooltip>
+                        <Select
+                            placeholder="Select Camera"
+                            value={roomStore.selectedVideoDevice?.deviceId ?? ""}
+                            onChange={(e) => roomStore.setVideoDevice(e.target.value)}
+                            maxW="200px"
+                        >
+                            {roomStore.videoDevices.map((device) => (
+                                <option key={device.deviceId} value={device.deviceId}>
+                                    {device.label || `Cam ${device.deviceId.slice(-4)}`}
+                                </option>
+                            ))}
+                        </Select>
+                    </HStack>
+
+                    <Text
+                        as="button"
+                        onClick={handleLeave}
+                        color="red.400"
+                        _hover={{ color: "red.600" }}
+                        fontWeight="bold"
+                    >
+                        Leave Call
+                    </Text>
+                </Flex>
             </Box>
         </Box>
     );
