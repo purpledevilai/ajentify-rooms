@@ -100,6 +100,7 @@ export class JSONRPCPeer {
                 console.error("Error: no handler for message", parsedMessage);
                 return;
             }
+            console.log("Handling request", parsedMessage.method);
 
             // If no response is expected
             if (!parsedMessage.id) {
@@ -111,6 +112,7 @@ export class JSONRPCPeer {
             // Otherwise call handler and send response
             try {
                 const response = await handler(parsedMessage.params);
+                console.log("Response", response);
                 this.sender(JSON.stringify({
                     id: parsedMessage.id,
                     result: response,

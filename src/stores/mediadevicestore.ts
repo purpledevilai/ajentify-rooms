@@ -14,7 +14,7 @@ class MediaDeviceStore {
 
     initializeMediaDevices = async () => {
         // Prompt for both video and audio
-        await navigator.mediaDevices.getUserMedia();
+        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
         // Get all the devices
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -23,18 +23,6 @@ class MediaDeviceStore {
         this.videoDevices = devices.filter((d) => d.kind === "videoinput");
         this.audioDevices = devices.filter((d) => d.kind === "audioinput");
 
-    }
-
-    toggleMute = (option: "audio" | "video") => {
-        if (!this.mediaStream) return;
-        let track: MediaStreamTrack | undefined = undefined;
-        if (option === "audio") {
-            track = this.mediaStream.getAudioTracks()[0];
-        } else if (option === "video") {
-            track = this.mediaStream.getVideoTracks()[0];
-        }
-        if (!track) return;
-        track.enabled = !track.enabled;
     }
 }
 

@@ -1,5 +1,7 @@
 import { JSONRPCPeer } from "./JSONRPCPeer";
 import { PeerConnection } from "./PeerConnection";
+import { makeAutoObservable } from "mobx";
+
 
 export class RoomConnection {
     id: string;
@@ -23,6 +25,9 @@ export class RoomConnection {
         selfDescription?: string;
         defaultMediaStream?: MediaStream | null;
     }) {
+        makeAutoObservable(this);
+
+        // Variables
         this.id = id;
         this.peerConnections = {};
         this.onPeerAdded = onPeerAdded;
@@ -35,8 +40,7 @@ export class RoomConnection {
         }
 
         // Create WebSocket 
-        const WS_URL = "wss://room-signaling-server.prod.rooms.ajentify.com/ws";
-        this.websocket = new WebSocket(WS_URL);
+        this.websocket = new WebSocket(import.meta.env.VITE_SIGNALING_SERVER_URL);
 
         // Create sender for JSON-RPC messages
         const sender = (message: string) => {
@@ -83,6 +87,46 @@ export class RoomConnection {
         return peerConnection;
     }
 
+    // CONNFIGURE PEER
+    private configurePeer = (peerConnection: PeerConnection, peer_id: string) => {
+        // Set on ICE candidate
+        peerConnection.pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log("Relaying ICE candidate");
+                this.roomServer.call("relay_ice_candidate", {
+                    peer_id,
+                    candidate: event.candidate,
+                });
+            }
+        }
+
+        // On ICE Connection State Change
+        peerConnection.pc.oniceconnectionstatechange = () => {
+            console.log("ICE connection state changed:", peerConnection.pc.iceConnectionState);
+            // Check if connection is closed
+            if (peerConnection.pc.iceConnectionState === "disconnected" || peerConnection.pc.iceConnectionState === "closed") {
+                console.log("ICE connection closed");
+                // Clean up peer connection
+                peerConnection.pc.close();
+                delete this.peerConnections[peer_id];
+                console.log("Peer connection removed:", peer_id);
+            }
+        }
+
+        // On Connection State Change
+        peerConnection.pc.onconnectionstatechange = () => {
+            console.log("Connection state changed:", peerConnection.pc.connectionState);
+            // Check if connection is closed
+            if (peerConnection.pc.connectionState === "disconnected" || peerConnection.pc.connectionState === "closed") {
+                console.log("Peer connection closed");
+                // Clean up peer connection
+                peerConnection.pc.close();
+                delete this.peerConnections[peer_id];
+                console.log("Peer connection removed:", peer_id);
+            }
+        }
+    }
+
     // PEER ADDED
     private peer_added = async (params: { peer_id: string; self_description: string }) => {
         console.log("Peer added:", params);
@@ -94,26 +138,21 @@ export class RoomConnection {
             return; // Rejecting to connect to peer
         }
 
-        // Set on ICE candidate
-        peerConnection.pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                this.roomServer.call("relay_ice_candidate", {
-                    peer_id,
-                    candidate: event.candidate,
-                });
-            }
-        }
-
+        // Configure peer connection
+        this.configurePeer(peerConnection, peer_id);
+        
         // Create offer
         const offer = await peerConnection.pc.createOffer();
         await peerConnection.pc.setLocalDescription(offer);
 
         // Send offer to peer
+        console.log("Calling request connection");
         const answerResponse = await this.roomServer.call("request_connection", {
             peer_id,
             self_description: peerConnection.selfDescription,
             offer,
         }, true, 10000);
+        console.log("Answer response:", answerResponse);
 
         // Check if we got an answer
         if (!answerResponse || !answerResponse.answer) {
@@ -123,6 +162,10 @@ export class RoomConnection {
 
         // Set answer
         await peerConnection.pc.setRemoteDescription(answerResponse.answer as RTCSessionDescriptionInit);
+
+        // Add peer connection to list
+        this.peerConnections[peer_id] = peerConnection;
+        console.log("Peer connection added:", peer_id);
     }
 
     // CONNECTION REQUEST
@@ -137,34 +180,57 @@ export class RoomConnection {
             return null; // Rejecting to connect to peer
         }
 
-        // Set on ICE candidate
-        peerConnection.pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                this.roomServer.call("relay_ice_candidate", {
-                    peer_id,
-                    candidate: event.candidate,
-                });
-            }
-        }
+        // Configure peer connection
+        this.configurePeer(peerConnection, peer_id);
 
         // Set remote and create answer
         await peerConnection.pc.setRemoteDescription(offer);
         const answer = await peerConnection.pc.createAnswer();
         await peerConnection.pc.setLocalDescription(answer);
 
+        // Add peer connection to list
+        this.peerConnections[peer_id] = peerConnection;
+        console.log("Peer connection added:", peer_id);
+
         // return answer
+        console.log("Sending answer:", answer);
         return answer
     }
 
     // ADD ICE CANDIDATE
     private add_ice_candidate = async (params: { peer_id: string; candidate: RTCIceCandidate }) => {
-        console.log("Adding ICE candidate:", params);
         const { peer_id, candidate } = params;
+
+        // Wait for peer connection to be created
+        let timeElapsed = 0;
+        const timeout = 10000; // 10 seconds
+        const waitInterval = 100;
+        while (!this.peerConnections[peer_id] && timeElapsed < timeout) {
+            timeElapsed += waitInterval;
+            await new Promise((resolve) => setTimeout(resolve, waitInterval));
+        }
 
         // Add ICE candidate to peer connection
         const peer = this.peerConnections[peer_id];
         if (peer) {
+            console.log("Adding ICE candidate:", params);
             await peer.pc.addIceCandidate(candidate);
+        } else {
+            console.log("ICE Peer not found:", peer_id);
         }
+    }
+
+    //  LEAVE ROOM
+    leaveRoom() {
+        console.log("Leaving room:", this.id);
+        // Close all peer connections
+        Object.keys(this.peerConnections || {}).forEach((key) => {
+            const peerConnection = this.peerConnections[key];
+            peerConnection?.pc.close();
+            delete this.peerConnections[key];
+            console.log("Peer connection closed:", key);
+        });
+        this.websocket.close();
+        this.peerConnections = {};
     }
 }

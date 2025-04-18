@@ -1,3 +1,5 @@
+import { makeAutoObservable } from "mobx";
+
 export class PeerConnection {
     id: string;
     selfDescription: string;
@@ -18,6 +20,8 @@ export class PeerConnection {
         selfDescription: string,
         outboundMediaStream: MediaStream,
     ) {
+        // Make this class observable
+        makeAutoObservable(this);
 
         // Variables
         this.id = id;
@@ -31,39 +35,17 @@ export class PeerConnection {
             ]
         });
 
-        // On ICE Connection State Change
-        this.pc.oniceconnectionstatechange = () => {
-            console.log("ICE connection state changed:", this.pc.iceConnectionState);
-        }
-
-        // On Connection State Change
-        this.pc.onconnectionstatechange = () => {
-            console.log("Connection state changed:", this.pc.connectionState);
-            // Check if connection is closed
-            if (this.pc.connectionState === "disconnected" || this.pc.connectionState === "closed") {
-                console.log("Peer connection closed");
-                // TODO: Notify disconnection
-            }
-        }
-
         // On Track
         this.pc.ontrack = (event) => {
             console.log("Received Track Event:", event);
             const [newStream] = event.streams;
             this.inboundMediaStream = newStream;
-            // TODO: Notify new stream
         };
 
-        // Create local media stream
-        const localStream = new MediaStream();
-        this.outboundMediaStream.getTracks().forEach((track) => {
-            localStream.addTrack(track);
-        });
-
         // Add local stream to peer connection
-        localStream.getTracks().forEach((track) => {
+        this.outboundMediaStream.getTracks().forEach((track) => {
             console.log("Adding local track to peer connection:", track);
-            this.pc.addTrack(track, localStream);
+            this.pc.addTrack(track, this.outboundMediaStream!);
         });
     }
 }

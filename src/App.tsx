@@ -3,6 +3,7 @@ import { ChakraProvider, extendTheme, ThemeConfig } from '@chakra-ui/react';
 import { AlertProvider } from "./components/AlertProvider";
 import SetRoomId from "./pages/setroomid";
 import Room from "./pages/room";
+import RegularChatRoom from "./pages/regularchatroom";
 
 const config: ThemeConfig = {
   initialColorMode: "dark",
@@ -101,7 +102,7 @@ function App() {
             <Route path="/" element={<Navigate to="/set-room-id" replace />} />
             <Route path="/set-room-id" element={<SetRoomId />} />
             {/* Room route with dynamic param */}
-            <Route path="/room/:roomId" element={<Room />} />
+            <Route path="/room/:roomId" element={<RegularChatRoom />} />
             {/* Catch-all - if you want. Otherwise, remove or handle differently */}
             <Route path="*" element={<Navigate to="/set-room-id" replace />} />
           </Routes>

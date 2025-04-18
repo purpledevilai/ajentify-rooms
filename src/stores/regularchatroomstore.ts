@@ -3,20 +3,30 @@ import { mediaDeviceStore } from "./mediadevicestore";
 import { RoomConnection } from "../lib/RoomConnection";
 
 export class RegularChatRoomStore {
+    hasInitialized = false;
     roomConnection: RoomConnection | undefined = undefined;
     selectedVideoDevice: MediaDeviceInfo | undefined = undefined;
     selectedAudioDevice: MediaDeviceInfo | undefined = undefined;
     mediaStream: MediaStream | undefined = undefined;
     audioMuted = false;
     videoMuted = false;
-    
+
     constructor() {
         makeAutoObservable(this);
     }
 
+    /**
+     * Initializes media devices (asking permission if not granted), sets default media stream, and sets up the room connection.
+     * @param roomId The ID of the room to connect to
+     */
     async initialize(roomId: string) {
+
+        if (this.hasInitialized) return;
+        this.hasInitialized = true;
+
         // Initialize media devices - asks for permission if not granted
         await mediaDeviceStore.initializeMediaDevices();
+        console.log("initialized media devices");
 
         // Set default selected devices
         this.selectedVideoDevice = mediaDeviceStore.videoDevices[0];
@@ -47,6 +57,10 @@ export class RegularChatRoomStore {
      * Reset the store
      */
     reset = () => {
+        if (this.roomConnection) {
+            this.roomConnection.leaveRoom();
+        }
+        this.hasInitialized = false;
         this.roomConnection = undefined;
         this.selectedVideoDevice = undefined;
         this.selectedAudioDevice = undefined;
@@ -135,13 +149,6 @@ export class RegularChatRoomStore {
      * Send a request to leave the room
      */
     leaveRoom() {
-        // Clean up local data
-        if (!this.roomConnection) return;
-        Object.keys(this.roomConnection.peerConnections || {}).forEach((key) => {
-            const peerConnection = this.roomConnection?.peerConnections[key];
-            peerConnection?.pc.close();
-            delete this.roomConnection?.peerConnections[key];
-        });
         this.mediaStream?.getVideoTracks().forEach((track) => track.stop());
         this.mediaStream?.getAudioTracks().forEach((track) => track.stop());
         this.mediaStream?.getTracks().forEach((track) => track.stop());
