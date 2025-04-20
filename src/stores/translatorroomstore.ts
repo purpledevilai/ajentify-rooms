@@ -1,0 +1,175 @@
+import { makeAutoObservable } from "mobx";
+import { mediaDeviceStore } from "./mediadevicestore";
+import { RoomConnection } from "../lib/RoomConnection";
+
+export class TranslatorRoomStore {
+    hasInitialized = false;
+    roomConnection: RoomConnection | undefined = undefined;
+    selectedVideoDevice: MediaDeviceInfo | undefined = undefined;
+    selectedAudioDevice: MediaDeviceInfo | undefined = undefined;
+    mediaStream: MediaStream | undefined = undefined;
+    audioMuted = false;
+    videoMuted = false;
+
+    constructor() {
+        makeAutoObservable(this);
+    }
+
+    /**
+     * Initializes media devices (asking permission if not granted), sets default media stream, and sets up the room connection.
+     * @param roomId The ID of the room to connect to
+     */
+    async initialize(roomId: string) {
+
+        if (this.hasInitialized) return;
+        this.hasInitialized = true;
+
+        // Initialize media devices - asks for permission if not granted
+        await mediaDeviceStore.initializeMediaDevices();
+        console.log("initialized media devices");
+
+        // Set default selected devices
+        this.selectedVideoDevice = mediaDeviceStore.videoDevices[0];
+        this.selectedAudioDevice = mediaDeviceStore.audioDevices[0];
+
+        // Set up media constraints
+        const videoConstraints = this.selectedVideoDevice
+            ? { deviceId: this.selectedVideoDevice.deviceId }
+            : false;
+        const audioConstraints = this.selectedAudioDevice
+            ? { deviceId: this.selectedAudioDevice.deviceId }
+            : false;
+
+        // Set the media stream
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
+            audio: audioConstraints,
+        });
+
+        // Create the room connection
+        this.roomConnection = new RoomConnection({
+            id: roomId,
+            defaultMediaStream: this.mediaStream,
+        });
+
+        // Call translator server to wake translator POST with roomId
+        const response = await fetch(
+            `${import.meta.env.VITE_TRANSLATOR_SERVER_URL}/wake-agent`, 
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    room_id: roomId,
+                }),
+            }
+        )
+        console.log("waking translator server", response);
+    }
+
+    /**
+     * Reset the store
+     */
+    reset = () => {
+        if (this.roomConnection) {
+            this.roomConnection.leaveRoom();
+        }
+        this.hasInitialized = false;
+        this.roomConnection = undefined;
+        this.selectedVideoDevice = undefined;
+        this.selectedAudioDevice = undefined;
+        this.mediaStream = undefined;
+        this.audioMuted = false;
+        this.videoMuted = false;
+    }
+
+    /**
+     * Toggle media device mute
+     */
+    toggleMediaDeviceMute(kind: "audio" | "video") {
+        if (!this.mediaStream) return;
+    
+        const tracks = kind === "audio"
+            ? this.mediaStream.getAudioTracks()
+            : this.mediaStream.getVideoTracks();
+    
+        if (tracks.length > 0) {
+            const track = tracks[0];
+            track.enabled = !track.enabled;
+    
+            if (kind === "audio") {
+                this.audioMuted = !this.audioMuted;
+            } else {
+                this.videoMuted = !this.videoMuted;
+            }
+        }
+    }
+    
+    /**
+     * Set Media Device
+     */
+    async setMediaDevice(deviceId: string, kind: "audio" | "video") {
+        const deviceList = kind === "audio"
+            ? mediaDeviceStore.audioDevices
+            : mediaDeviceStore.videoDevices;
+    
+        const device = deviceList.find((d) => d.deviceId === deviceId);
+        if (!device || !this.mediaStream) return;
+    
+        const constraints = kind === "audio"
+            ? { audio: { deviceId }, video: false }
+            : { audio: false, video: { deviceId } };
+    
+        const tempStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+        const newTrack = kind === "audio"
+            ? tempStream.getAudioTracks()[0]
+            : tempStream.getVideoTracks()[0];
+    
+        const oldTrack = kind === "audio"
+            ? this.mediaStream.getAudioTracks()[0]
+            : this.mediaStream.getVideoTracks()[0];
+    
+        if (oldTrack) {
+            this.mediaStream.removeTrack(oldTrack);
+            oldTrack.stop();
+        }
+    
+        this.mediaStream.addTrack(newTrack);
+    
+        for (const peerConnection of Object.values(this.roomConnection?.peerConnections || {})) {
+            const sender = peerConnection.pc.getSenders().find(
+                (s) => s.track?.kind === newTrack.kind
+            );
+            if (sender) {
+                await sender.replaceTrack(newTrack);
+            }
+        }
+    
+        // Clean up other temp tracks
+        tempStream.getTracks().forEach((track) => {
+            if (track !== newTrack) track.stop();
+        });
+    
+        if (kind === "audio") {
+            this.selectedAudioDevice = device;
+        } else {
+            this.selectedVideoDevice = device;
+        }
+    }
+    
+
+    /**
+     * Send a request to leave the room
+     */
+    leaveRoom() {
+        this.mediaStream?.getVideoTracks().forEach((track) => track.stop());
+        this.mediaStream?.getAudioTracks().forEach((track) => track.stop());
+        this.mediaStream?.getTracks().forEach((track) => track.stop());
+        this.reset();
+    }
+}
+
+// Export a singleton store
+export const translatorRoomStore = new TranslatorRoomStore();

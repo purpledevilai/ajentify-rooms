@@ -152,7 +152,7 @@ export class RoomConnection {
             self_description: peerConnection.selfDescription,
             offer,
         }, true, 10000);
-        console.log("Answer response:", answerResponse);
+        console.log("Answer response:", JSON.stringify(answerResponse));
 
         // Check if we got an answer
         if (!answerResponse || !answerResponse.answer) {
