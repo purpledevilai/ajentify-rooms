@@ -9,6 +9,7 @@ export const MediaStreamVideo = ({ stream, muted = false }: MediaStreamVideoProp
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
+        console.log("Setting video stream:", stream);
         if (videoRef.current) {
             videoRef.current.srcObject = stream;
         }

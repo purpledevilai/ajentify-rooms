@@ -38,6 +38,7 @@ export class PeerConnection {
         // On Track
         this.pc.ontrack = (event) => {
             console.log("Received Track Event:", event);
+            console.log("Stream:", event.streams[0]);
             const [newStream] = event.streams;
             this.inboundMediaStream = newStream;
         };

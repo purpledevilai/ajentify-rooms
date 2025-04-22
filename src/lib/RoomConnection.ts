@@ -144,6 +144,7 @@ export class RoomConnection {
         // Create offer
         const offer = await peerConnection.pc.createOffer();
         await peerConnection.pc.setLocalDescription(offer);
+        console.log(`Created offer:`, JSON.stringify(offer));
 
         // Send offer to peer
         console.log("Calling request connection");
