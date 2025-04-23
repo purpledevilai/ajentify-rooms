@@ -5,30 +5,32 @@ import { makeAutoObservable } from "mobx";
 
 export class RoomConnection {
     id: string;
+    selfDescription: string;
     peerConnections: Record<string, PeerConnection>;
-    roomServer: JSONRPCPeer;
-    websocket: WebSocket;
-    onPeerAdded: (peerId: string, selfDescription: string) => PeerConnection | null;
-    onConnectionRequest: (peerId: string, selfDescription: string) => PeerConnection | null;
+    roomServer: JSONRPCPeer | null = null;
+    websocket: WebSocket | null = null;
+    onPeerAdded: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
+    onConnectionRequest: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
     defaultMediaStream: MediaStream | null;
 
     constructor({
         id,
-        onPeerAdded = this.defaultCreatePeer,
-        onConnectionRequest = this.defaultCreatePeer,
         selfDescription = "Peer",
+        onPeerAdded = this.defaultCreatePeer,
+        onConnectionRequest = this.defaultCreatePeer,    
         defaultMediaStream = null,
     }: {
         id: string;
-        onPeerAdded?: (peerId: string, selfDescription: string) => PeerConnection | null;
-        onConnectionRequest?: (peerId: string, selfDescription: string) => PeerConnection | null;
         selfDescription?: string;
+        onPeerAdded?: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
+        onConnectionRequest?: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
         defaultMediaStream?: MediaStream | null;
     }) {
         makeAutoObservable(this);
 
         // Variables
         this.id = id;
+        this.selfDescription = selfDescription;
         this.peerConnections = {};
         this.onPeerAdded = onPeerAdded;
         this.onConnectionRequest = onConnectionRequest;
@@ -38,50 +40,75 @@ export class RoomConnection {
         if ((!this.onPeerAdded || !this.onConnectionRequest) && !this.defaultMediaStream) {
             throw new Error("You must provide a default media stream if no onPeerAdded or onConnectionRequest is provided");
         }
-
-        // Create WebSocket 
-        this.websocket = new WebSocket(import.meta.env.VITE_SIGNALING_SERVER_URL);
-
-        // Create sender for JSON-RPC messages
-        const sender = (message: string) => {
-            this.websocket.send(message);
-        }
-
-        // Set up JSON-RPC peer
-        this.roomServer = new JSONRPCPeer(sender);
-        this.roomServer.on("peer_added", this.peer_added as (params: Record<string, any>) => any);
-        this.roomServer.on("connection_request", this.connection_request as (params: Record<string, any>) => any);
-        this.roomServer.on("add_ice_candidate", this.add_ice_candidate as (params: Record<string, any>) => any);
-
-        // On Message
-        this.websocket.onmessage = (event) => {
-            this.roomServer.handleMessage(event.data);
-        }
-
-        // On Error
-        this.websocket.onerror = (err) => {
-            console.error("WebSocket error:", err);
-        };
-
-        // On Close
-        this.websocket.onclose = () => {
-            console.log("WebSocket closed");
-            // Clean up peer connections
-            for (const key in this.peerConnections) {
-                this.peerConnections[key].pc.close();
-                delete this.peerConnections[key];
-            }
-        };
-
-        // On Connect, Join the room
-        this.websocket.onopen = async () => {
-            console.log("WebSocket connected");
-            this.roomServer.call("join", { room_id: this.id, self_description: selfDescription });
-        };
+        
     }
 
+    // JOIN ROOM
+    async joinRoom(): Promise<any> {
+        return new Promise((resolve, reject) => {
+            // Create WebSocket 
+            this.websocket = new WebSocket(import.meta.env.VITE_SIGNALING_SERVER_URL);
+    
+            // Create sender for JSON-RPC messages
+            const sender = (message: string) => {
+                if (!this.websocket) {
+                    throw new Error("WebSocket is not initialized");
+                }
+                this.websocket.send(message);
+            };
+    
+            // Set up JSON-RPC peer
+            this.roomServer = new JSONRPCPeer(sender);
+            this.roomServer.on("peer_added", this.peer_added as (params: Record<string, any>) => any);
+            this.roomServer.on("connection_request", this.connection_request as (params: Record<string, any>) => any);
+            this.roomServer.on("add_ice_candidate", this.add_ice_candidate as (params: Record<string, any>) => any);
+    
+            // On Message
+            this.websocket.onmessage = (event) => {
+                if (!this.roomServer) {
+                    throw new Error("WebSocket is not initialized");
+                }
+                this.roomServer.handleMessage(event.data);
+            };
+    
+            // On Error
+            this.websocket.onerror = (err) => {
+                console.error("WebSocket error:", err);
+                reject(err);
+            };
+    
+            // On Close
+            this.websocket.onclose = () => {
+                console.log("WebSocket closed");
+                for (const key in this.peerConnections) {
+                    this.peerConnections[key].pc.close();
+                    delete this.peerConnections[key];
+                }
+            };
+    
+            // On Open
+            this.websocket.onopen = async () => {
+                console.log("WebSocket connected");
+                try {
+                    if (!this.roomServer) {
+                        throw new Error("WebSocket is not initialized");
+                    }
+                    const existingPeers = await this.roomServer.call("join", {
+                        room_id: this.id,
+                        self_description: this.selfDescription
+                    }, true);
+                    console.log("Existing peers:", existingPeers);
+                    resolve(existingPeers);
+                } catch (err) {
+                    reject(err);
+                }
+            };
+        });
+    }
+    
+
     // DEFAULT ON PEER ADDED
-    private defaultCreatePeer = (peerId: string, selfDescription: string) => {
+    private defaultCreatePeer = async (peerId: string, selfDescription: string) => {
         console.log("Default onPeerAdded called");
         const peerConnection = new PeerConnection(peerId, selfDescription, this.defaultMediaStream!);
         return peerConnection;
@@ -93,6 +120,9 @@ export class RoomConnection {
         peerConnection.pc.onicecandidate = (event) => {
             if (event.candidate) {
                 console.log("Relaying ICE candidate");
+                if (!this.roomServer) {
+                    throw new Error("WebSocket is not initialized");
+                }
                 this.roomServer.call("relay_ice_candidate", {
                     peer_id,
                     candidate: event.candidate,
@@ -133,7 +163,7 @@ export class RoomConnection {
         const { peer_id, self_description } = params;
 
         // Ask domain logic if we want to connect to this peer
-        const peerConnection = this.onPeerAdded(peer_id, self_description);
+        const peerConnection = await this.onPeerAdded(peer_id, self_description);
         if (!peerConnection) {
             return; // Rejecting to connect to peer
         }
@@ -144,16 +174,17 @@ export class RoomConnection {
         // Create offer
         const offer = await peerConnection.pc.createOffer();
         await peerConnection.pc.setLocalDescription(offer);
-        console.log(`Created offer:`, JSON.stringify(offer));
 
         // Send offer to peer
         console.log("Calling request connection");
+        if (!this.roomServer) {
+            throw new Error("WebSocket is not initialized");
+        }
         const answerResponse = await this.roomServer.call("request_connection", {
             peer_id,
-            self_description: peerConnection.selfDescription,
+            self_description: this.selfDescription,
             offer,
         }, true, 10000);
-        console.log("Answer response:", JSON.stringify(answerResponse));
 
         // Check if we got an answer
         if (!answerResponse || !answerResponse.answer) {
@@ -175,7 +206,7 @@ export class RoomConnection {
         const { peer_id, self_description, offer } = params;
 
         // Ask domain logic if we want to connect to this peer
-        const peerConnection = this.onConnectionRequest(peer_id, self_description);
+        const peerConnection = await this.onConnectionRequest(peer_id, self_description);
         if (!peerConnection) {
             console.log("Connection request rejected");
             return null; // Rejecting to connect to peer
@@ -231,7 +262,10 @@ export class RoomConnection {
             delete this.peerConnections[key];
             console.log("Peer connection closed:", key);
         });
-        this.websocket.close();
+        if (this.websocket) {
+            this.websocket.close();
+            this.websocket = null;
+        }
         this.peerConnections = {};
     }
 }
