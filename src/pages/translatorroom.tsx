@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import {
@@ -11,6 +11,15 @@ import {
     HStack,
     Select,
     Tooltip,
+    useDisclosure,
+    Button,
+    Modal,
+    ModalBody,
+    ModalCloseButton,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    ModalOverlay,
 } from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-icons/fa";
@@ -22,6 +31,9 @@ const TranslatorRoom = observer(() => {
     const { roomId } = useParams();
     const navigate = useNavigate();
     const localVideoRef = useRef<HTMLVideoElement>(null);
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+
 
 
     const { colorMode, toggleColorMode } = useColorMode();
@@ -41,9 +53,8 @@ const TranslatorRoom = observer(() => {
             navigate("/set-room-id");
             return;
         }
-    
-        console.log("Initializing regular chat room with ID:", roomId);
-        translatorRoomStore.initialize(roomId);
+
+        onOpen(); // Open modal to choose language
 
     }, [roomId, navigate]);
 
@@ -66,6 +77,13 @@ const TranslatorRoom = observer(() => {
             localVideoRef.current.srcObject = translatorRoomStore.mediaStream;
         }
     }, [translatorRoomStore.mediaStream]);
+
+    const handleLanguageConfirm = () => {
+        if (roomId && selectedLanguage) {
+            translatorRoomStore.initialize(roomId, selectedLanguage); // assuming it takes (roomId, langCode)
+            onClose();
+        }
+    };
 
     const handleLeave = () => {
         translatorRoomStore.leaveRoom();
@@ -132,7 +150,7 @@ const TranslatorRoom = observer(() => {
                 <Text fontSize="lg" mb={4}>Translator Room ID: {roomId}</Text>
 
                 {/* Peer Video Elements */}
-                {translatorRoomStore.roomConnection && <PeerVideoElements roomConnection={translatorRoomStore.roomConnection}/>}
+                {translatorRoomStore.roomConnection && <PeerVideoElements roomConnection={translatorRoomStore.roomConnection} />}
             </Flex>
 
             {/* Control Bar (Bottom Overlay) */}
@@ -152,7 +170,7 @@ const TranslatorRoom = observer(() => {
                         <Tooltip label="Mute / Unmute Microphone">
                             <IconButton
                                 aria-label="Toggle Mute Audio"
-                                icon={translatorRoomStore.audioMuted ? <FaMicrophoneSlash /> : <FaMicrophone /> }
+                                icon={translatorRoomStore.audioMuted ? <FaMicrophoneSlash /> : <FaMicrophone />}
                                 onClick={() => translatorRoomStore.toggleMediaDeviceMute("audio")}
                             />
                         </Tooltip>
@@ -204,6 +222,26 @@ const TranslatorRoom = observer(() => {
                     </Text>
                 </Flex>
             </Box>
+            <Modal isOpen={isOpen} onClose={() => { }} isCentered closeOnOverlayClick={false}>
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Select Your Preferred Language</ModalHeader>
+                    <ModalCloseButton display="none" />
+                    <ModalBody>
+                        <Select placeholder="Choose language" onChange={(e) => setSelectedLanguage(e.target.value)}>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="zh">Mandarin</option>
+                        </Select>
+                    </ModalBody>
+
+                    <ModalFooter>
+                        <Button colorScheme="blue" onClick={handleLanguageConfirm} isDisabled={!selectedLanguage}>
+                            Continue
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
         </Box>
     );
 });

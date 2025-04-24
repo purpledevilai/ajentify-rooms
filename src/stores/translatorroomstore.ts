@@ -19,7 +19,7 @@ export class TranslatorRoomStore {
      * Initializes media devices (asking permission if not granted), sets default media stream, and sets up the room connection.
      * @param roomId The ID of the room to connect to
      */
-    async initialize(roomId: string) {
+    async initialize(roomId: string, languageCode: string) {
 
         // Initialize media devices - asks for permission if not granted
         await mediaDeviceStore.initializeMediaDevices();
@@ -46,6 +46,7 @@ export class TranslatorRoomStore {
         // Create the room connection
         this.roomConnection = new RoomConnection({
             id: roomId,
+            selfDescription: `Peer ${languageCode}`,
             onPeerAdded: this.onPeerAddedOrConnectionRequest,
             onConnectionRequest: this.onPeerAddedOrConnectionRequest,
         });
