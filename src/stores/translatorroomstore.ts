@@ -125,20 +125,44 @@ export class TranslatorRoomStore {
      * Toggle media device mute
      */
     toggleMediaDeviceMute(kind: "audio" | "video") {
+        console.log("Toggling media device mute", kind);
         if (!this.mediaStream) return;
-
+    
+        // Toggle local stream track
         const tracks = kind === "audio"
             ? this.mediaStream.getAudioTracks()
             : this.mediaStream.getVideoTracks();
-
+    
         if (tracks.length > 0) {
             const track = tracks[0];
-            track.enabled = !track.enabled;
-
+            const newEnabledState = !track.enabled;
+            track.enabled = newEnabledState;
+            console.log(`${kind} track enabled:`, newEnabledState);
+    
             if (kind === "audio") {
-                this.audioMuted = !this.audioMuted;
+                this.audioMuted = !newEnabledState;
             } else {
-                this.videoMuted = !this.videoMuted;
+                this.videoMuted = !newEnabledState;
+            }
+    
+            // Also update all outbound tracks of same kind in each peer connection
+            if (this.roomConnection) {
+                Object.values(this.roomConnection.peerConnections).forEach((peerConn) => {
+                    const outboundStream = peerConn.outboundMediaStream;
+                    if (!outboundStream) return;
+    
+                    const peerTracks = kind === "audio"
+                        ? outboundStream.getAudioTracks()
+                        : outboundStream.getVideoTracks();
+    
+                    peerTracks.forEach((peerTrack) => {
+                        peerTrack.enabled = newEnabledState;
+                        console.log(
+                            `Updated ${kind} track for peer ${peerConn.id} to enabled:`,
+                            newEnabledState
+                        );
+                    });
+                });
             }
         }
     }
@@ -150,31 +174,32 @@ export class TranslatorRoomStore {
         const deviceList = kind === "audio"
             ? mediaDeviceStore.audioDevices
             : mediaDeviceStore.videoDevices;
-
+    
         const device = deviceList.find((d) => d.deviceId === deviceId);
         if (!device || !this.mediaStream) return;
-
+    
         const constraints = kind === "audio"
             ? { audio: { deviceId }, video: false }
             : { audio: false, video: { deviceId } };
-
+    
         const tempStream = await navigator.mediaDevices.getUserMedia(constraints);
-
+    
         const newTrack = kind === "audio"
             ? tempStream.getAudioTracks()[0]
             : tempStream.getVideoTracks()[0];
-
+    
         const oldTrack = kind === "audio"
             ? this.mediaStream.getAudioTracks()[0]
             : this.mediaStream.getVideoTracks()[0];
-
+    
+        // Replace in local display stream
         if (oldTrack) {
             this.mediaStream.removeTrack(oldTrack);
             oldTrack.stop();
         }
-
         this.mediaStream.addTrack(newTrack);
-
+    
+        // Replace in each peer connection
         for (const peerConnection of Object.values(this.roomConnection?.peerConnections || {})) {
             const sender = peerConnection.pc.getSenders().find(
                 (s) => s.track?.kind === newTrack.kind
@@ -182,13 +207,27 @@ export class TranslatorRoomStore {
             if (sender) {
                 await sender.replaceTrack(newTrack);
             }
+    
+            // Also update outboundMediaStream if available
+            if (peerConnection.outboundMediaStream) {
+                const outboundTracks = kind === "audio"
+                    ? peerConnection.outboundMediaStream.getAudioTracks()
+                    : peerConnection.outboundMediaStream.getVideoTracks();
+    
+                // Remove old track of the same kind
+                outboundTracks.forEach((t) => peerConnection.outboundMediaStream?.removeTrack(t));
+    
+                // Add the new track
+                peerConnection.outboundMediaStream.addTrack(newTrack);
+            }
         }
-
-        // Clean up other temp tracks
+    
+        // Clean up any other tracks from temp stream
         tempStream.getTracks().forEach((track) => {
             if (track !== newTrack) track.stop();
         });
-
+    
+        // Update selection
         if (kind === "audio") {
             this.selectedAudioDevice = device;
         } else {
