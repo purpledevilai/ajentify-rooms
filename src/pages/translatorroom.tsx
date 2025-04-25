@@ -26,6 +26,7 @@ import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-ic
 import { translatorRoomStore } from "../stores/translatorroomstore";
 import { mediaDeviceStore } from "../stores/mediadevicestore";
 import { PeerVideoElements } from "./components/PeerVideoElements";
+import { MessageFeed } from "./components/MessageFeed";
 
 const TranslatorRoom = observer(() => {
     const { roomId } = useParams();
@@ -140,9 +141,10 @@ const TranslatorRoom = observer(() => {
                 align="center"
                 justify="start"
                 height="100%"
+                gap={4}
                 px={4}
                 pt="160px"
-                pb="160px"
+                pb="200px"
                 overflowY="auto"
                 position="relative"
                 zIndex={1}
@@ -151,6 +153,12 @@ const TranslatorRoom = observer(() => {
 
                 {/* Peer Video Elements */}
                 {translatorRoomStore.roomConnection && <PeerVideoElements roomConnection={translatorRoomStore.roomConnection} />}
+
+                {/* Message Feed */}
+                <Box h="300px">
+                    <MessageFeed />
+                </Box>
+
             </Flex>
 
             {/* Control Bar (Bottom Overlay) */}

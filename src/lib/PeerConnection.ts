@@ -6,47 +6,73 @@ export class PeerConnection {
     outboundMediaStream: MediaStream | null = null;
     pc: RTCPeerConnection;
     inboundMediaStream: MediaStream | null = null;
+    dataChannel: RTCDataChannel | null = null;
 
-    /**
-     * CONSTRUCTOR
-     * 
-     * @param id ID of the remote peer
-     * @param selfDescription Description of what you are to the remote peer
-     * @param outboundMediaStream The mediastream you would like to publish to the remote peer
-     * @description Constructor for the PeerConnection class. This class is used to represent a connection to a remote peer. 
-     */
     constructor(
         id: string,
         selfDescription: string,
         outboundMediaStream: MediaStream,
+        createDataChannel: boolean = false,
+        onMessageCallback: (message: string) => void = () => {}
     ) {
-        // Make this class observable
         makeAutoObservable(this);
 
-        // Variables
         this.id = id;
         this.selfDescription = selfDescription;
         this.outboundMediaStream = outboundMediaStream;
 
-        // Create RTCPeerConnection
         this.pc = new RTCPeerConnection({
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" }
-            ]
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
         });
 
-        // On Track
+        // ✅ If this peer is the initiator, create data channel
+        if (createDataChannel) {
+            this.dataChannel = this.pc.createDataChannel("chat");
+
+            this.dataChannel.onopen = () => {
+                console.log(`[${this.id}] DataChannel is open and ready`);
+            };
+
+            this.dataChannel.onmessage = (event) => {
+                console.log(`[${this.id}] Received message:`, event.data);
+                if (onMessageCallback) onMessageCallback(event.data);
+            };
+        }
+
+        // ✅ If this peer is the answerer, listen for incoming data channels
+        this.pc.ondatachannel = (event) => {
+            console.log(`[${this.id}] Incoming data channel`);
+            this.dataChannel = event.channel;
+
+            this.dataChannel.onopen = () => {
+                console.log(`[${this.id}] Incoming DataChannel is open`);
+            };
+
+            this.dataChannel.onmessage = (event) => {
+                console.log(`[${this.id}] Received message from remote:`, event.data);
+                if (onMessageCallback) onMessageCallback(event.data);
+            };
+        };
+
         this.pc.ontrack = (event) => {
             console.log("Received Track Event:", event);
-            console.log("Stream:", event.streams[0]);
             const [newStream] = event.streams;
             this.inboundMediaStream = newStream;
         };
 
-        // Add local stream to peer connection
+        // Add local media tracks
         this.outboundMediaStream.getTracks().forEach((track) => {
-            console.log("Adding local track to peer connection:", track);
+            console.log("Adding local track:", track);
             this.pc.addTrack(track, this.outboundMediaStream!);
         });
+    }
+
+    sendMessage(message: string) {
+        if (this.dataChannel?.readyState === "open") {
+            this.dataChannel.send(message);
+            console.log(`[${this.id}] Sent message:`, message);
+        } else {
+            console.warn(`[${this.id}] Data channel not ready`);
+        }
     }
 }

@@ -10,9 +10,26 @@ export class TranslatorRoomStore {
     mediaStream: MediaStream | undefined = undefined;
     audioMuted = false;
     videoMuted = false;
+    messages: string[] = [];
 
     constructor() {
         makeAutoObservable(this);
+    }
+
+    /**
+     * Reset the store
+     */
+    reset = () => {
+        if (this.roomConnection) {
+            this.roomConnection.leaveRoom();
+        }
+        this.roomConnection = undefined;
+        this.selectedVideoDevice = undefined;
+        this.selectedAudioDevice = undefined;
+        this.mediaStream = undefined;
+        this.audioMuted = false;
+        this.videoMuted = false;
+        this.messages = [];
     }
 
     /**
@@ -47,8 +64,8 @@ export class TranslatorRoomStore {
         this.roomConnection = new RoomConnection({
             id: roomId,
             selfDescription: `Peer ${languageCode}`,
-            onPeerAdded: this.onPeerAddedOrConnectionRequest,
-            onConnectionRequest: this.onPeerAddedOrConnectionRequest,
+            onPeerAdded: this.onPeerAdded,
+            onConnectionRequest: this.onConnectionRequest,
         });
 
         // Join the room
@@ -75,10 +92,19 @@ export class TranslatorRoomStore {
         }
     }
 
+    onPeerAdded = async (peerId: string, selfDescription: string) => {
+        const shouldCreateDataChannel = selfDescription === "Translator";
+        return await this.onPeerAddedOrConnectionRequest(peerId, selfDescription, shouldCreateDataChannel);
+    }
+
+    onConnectionRequest = async (peerId: string, selfDescription: string) => {
+        return await this.onPeerAddedOrConnectionRequest(peerId, selfDescription, false);
+    }
+
     /**
      * Peer added or connection request
      */
-    onPeerAddedOrConnectionRequest = async (peerId: string, selfDescription: string) => {
+    onPeerAddedOrConnectionRequest = async (peerId: string, selfDescription: string, createDataChanel: boolean) => {
 
         // Get media constraints
         let videoConstraints = this.selectedVideoDevice
@@ -102,23 +128,13 @@ export class TranslatorRoomStore {
             video: videoConstraints,
             audio: audioConstraints,
         });
-        const peer = new PeerConnection(peerId, selfDescription, mediaStream);
+        const peer = new PeerConnection(peerId, selfDescription, mediaStream, createDataChanel, this.onMessageReceived);
         return peer
     }
 
-    /**
-     * Reset the store
-     */
-    reset = () => {
-        if (this.roomConnection) {
-            this.roomConnection.leaveRoom();
-        }
-        this.roomConnection = undefined;
-        this.selectedVideoDevice = undefined;
-        this.selectedAudioDevice = undefined;
-        this.mediaStream = undefined;
-        this.audioMuted = false;
-        this.videoMuted = false;
+    onMessageReceived = (message: string) => {
+        this.messages.push(message);
+        console.log("messages:", JSON.stringify(this.messages));
     }
 
     /**
