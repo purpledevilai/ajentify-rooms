@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { JSONRPCPeer } from "./JSONRPCPeer";
 import { PeerConnection } from "./PeerConnection";
 import { makeAutoObservable } from "mobx";

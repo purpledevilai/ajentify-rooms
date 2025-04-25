@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { ChakraProvider, extendTheme, ThemeConfig } from '@chakra-ui/react';
 import { AlertProvider } from "./components/AlertProvider";
 import SetRoomId from "./pages/setroomid";
-import Room from "./pages/room";
 import RegularChatRoom from "./pages/regularchatroom";
 import TranslatorRoom from "./pages/translatorroom";
 
