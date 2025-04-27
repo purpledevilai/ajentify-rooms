@@ -33,8 +33,8 @@ export class RoomConnection {
         this.id = id;
         this.selfDescription = selfDescription;
         this.peerConnections = {};
-        this.onPeerAdded = onPeerAdded;
-        this.onConnectionRequest = onConnectionRequest;
+        this.onPeerAdded = onPeerAdded || this.defaultCreatePeer;
+        this.onConnectionRequest = onConnectionRequest || this.defaultCreatePeer;
         this.defaultMediaStream = defaultMediaStream;
 
         // Check that if there is no onPeerAdded that there must be a default media stream
