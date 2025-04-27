@@ -48,7 +48,7 @@ export class RoomConnection {
     async joinRoom(): Promise<any> {
         return new Promise((resolve, reject) => {
             // Create WebSocket 
-            this.websocket = new WebSocket(import.meta.env.VITE_SIGNALING_SERVER_URL);
+            this.websocket = new WebSocket(`${import.meta.env.VITE_SIGNALING_SERVER_URL}/ws`);
     
             // Create sender for JSON-RPC messages
             const sender = (message: string) => {
