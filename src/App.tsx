@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { ChakraProvider, extendTheme, ThemeConfig } from '@chakra-ui/react';
 import { AlertProvider } from "./components/AlertProvider";
 import SetRoomId from "./pages/setroomid";
-import Room from "./pages/room";
+import RegularChatRoom from "./pages/regularchatroom";
+import TranslatorRoom from "./pages/translatorroom";
 
 const config: ThemeConfig = {
   initialColorMode: "dark",
@@ -101,8 +102,10 @@ function App() {
             <Route path="/" element={<Navigate to="/set-room-id" replace />} />
             <Route path="/set-room-id" element={<SetRoomId />} />
             {/* Room route with dynamic param */}
-            <Route path="/room/:roomId" element={<Room />} />
-            {/* Catch-all - if you want. Otherwise, remove or handle differently */}
+            <Route path="/room/:roomId" element={<RegularChatRoom />} />
+            {/* Translator room route with dynamic param */}
+            <Route path="/translator-room/:roomId" element={<TranslatorRoom />} />
+            {/* Catch-all - Otherwise, remove or handle differently */}
             <Route path="*" element={<Navigate to="/set-room-id" replace />} />
           </Routes>
         </Router>

@@ -24,6 +24,11 @@ function SetRoomId() {
     navigate(`/room/${roomId.trim()}`);
   };
 
+  const handleJoinTranslatorRoom = () => {
+    if (!roomId.trim()) return;
+    navigate(`/translator-room/${roomId.trim()}`);
+  };
+
   const bg = useColorModeValue("gray.100", "gray.800");
   const inputBg = useColorModeValue("white", "gray.700");
   const inputBorder = useColorModeValue("gray.300", "gray.600");
@@ -76,9 +81,17 @@ function SetRoomId() {
               boxShadow: "0 0 0 1px var(--chakra-colors-brand-500)",
             }}
           />
-          <Button width="100%" onClick={handleJoin} colorScheme="brand">
-            Join
-          </Button>
+          <Flex
+            direction="column"
+            gap={2}
+          >
+            <Button width="100%" onClick={handleJoin} colorScheme="brand">
+              Join
+            </Button>
+            <Button width="100%" onClick={handleJoinTranslatorRoom} colorScheme="brand">
+              Translator Room✨
+            </Button>
+          </Flex>
         </Box>
       </Flex>
     </Box>
