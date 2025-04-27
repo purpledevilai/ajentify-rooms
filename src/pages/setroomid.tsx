@@ -111,6 +111,7 @@ function SetRoomId() {
             <Button width="100%" onClick={handleJoinTranslatorRoom} colorScheme="brand">
               Translator Room ✨
             </Button>
+            <Box height={20}></Box>
             <Button
               width="100%"
               onClick={onOpen}
