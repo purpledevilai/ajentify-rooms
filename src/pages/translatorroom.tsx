@@ -155,7 +155,7 @@ const TranslatorRoom = observer(() => {
                 {translatorRoomStore.roomConnection && <PeerVideoElements roomConnection={translatorRoomStore.roomConnection} />}
 
                 {/* Message Feed */}
-                <Box h="300px">
+                <Box h="300px" w="100%">
                     <MessageFeed />
                 </Box>
 
@@ -239,7 +239,10 @@ const TranslatorRoom = observer(() => {
                         <Select placeholder="Choose language" onChange={(e) => setSelectedLanguage(e.target.value)}>
                             <option value="en">English</option>
                             <option value="es">Spanish</option>
-                            <option value="zh">Mandarin</option>
+                            <option value="zh">Chinese (Mandarin)</option>
+                            <option value="si">Sinhala</option> {/* Sri Lankan */}
+                            <option value="tl">Tagalog</option> {/* Filipino */}
+                            <option value="fa">Persian (Farsi)</option> {/* Iranian */}
                         </Select>
                     </ModalBody>
 

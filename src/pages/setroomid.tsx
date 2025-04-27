@@ -10,14 +10,21 @@ import {
   useColorMode,
   IconButton,
   Text,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 
 function SetRoomId() {
   const [roomId, setRoomId] = useState("");
   const navigate = useNavigate();
-
   const { colorMode, toggleColorMode } = useColorMode();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const handleJoin = () => {
     if (!roomId.trim()) return;
@@ -27,6 +34,22 @@ function SetRoomId() {
   const handleJoinTranslatorRoom = () => {
     if (!roomId.trim()) return;
     navigate(`/translator-room/${roomId.trim()}`);
+  };
+
+  const handleResetRoom = async () => {
+    if (!roomId.trim()) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SIGNALING_SERVER_URL_HTTP}/reset/${roomId.trim()}`);
+      if (!response.ok) {
+        throw new Error("Failed to reset room");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to reset the room.");
+    } finally {
+      onClose();
+    }
   };
 
   const bg = useColorModeValue("gray.100", "gray.800");
@@ -81,19 +104,44 @@ function SetRoomId() {
               boxShadow: "0 0 0 1px var(--chakra-colors-brand-500)",
             }}
           />
-          <Flex
-            direction="column"
-            gap={2}
-          >
+          <Flex direction="column" gap={2}>
             <Button width="100%" onClick={handleJoin} colorScheme="brand">
               Join
             </Button>
             <Button width="100%" onClick={handleJoinTranslatorRoom} colorScheme="brand">
-              Translator Room✨
+              Translator Room ✨
+            </Button>
+            <Button
+              width="100%"
+              onClick={onOpen}
+              color={"red"}
+              borderColor={"red"}
+              variant="outline"
+            >
+              Reset Room
             </Button>
           </Flex>
         </Box>
       </Flex>
+
+      {/* Reset Room Confirmation Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Confirm Reset</ModalHeader>
+          <ModalBody>
+            Are you sure you want to reset the room "{roomId}"? This will disconnect all users.
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button colorScheme="red" onClick={handleResetRoom}>
+              Reset Room
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }

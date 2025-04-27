@@ -27,9 +27,13 @@ export const MessageFeed = observer(() => {
             color="white"
         >
             <VStack align="start" spacing={2}>
-                {translatorRoomStore.messages.map((msg, idx) => (
-                    <Text key={idx}>{msg}</Text>
-                ))}
+                {translatorRoomStore.messages.length !== 0 ? (
+                    translatorRoomStore.messages.map((msg, idx) => (
+                        <Text key={idx}>{msg}</Text>
+                    ))
+                ) : (
+                    <Text>No transcript yet.</Text>
+                )}
                 <div ref={messagesEndRef} />
             </VStack>
         </Box>
