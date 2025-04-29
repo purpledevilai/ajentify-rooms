@@ -13,7 +13,7 @@ export class PeerConnection {
         selfDescription: string,
         outboundMediaStream: MediaStream,
         createDataChannel: boolean = false,
-        onMessageCallback: (message: string) => void = () => {}
+        onMessageCallback: (message: string) => void = () => { }
     ) {
         makeAutoObservable(this);
 
@@ -22,7 +22,31 @@ export class PeerConnection {
         this.outboundMediaStream = outboundMediaStream;
 
         this.pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+            iceServers: [
+                {
+                    urls: "stun:stun.relay.metered.ca:80",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80",
+                    username: "854bc4758e20cfe78cf64c95",
+                    credential: "+KBw1GxPiZBSkrmt",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                    username: "854bc4758e20cfe78cf64c95",
+                    credential: "+KBw1GxPiZBSkrmt",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:443",
+                    username: "854bc4758e20cfe78cf64c95",
+                    credential: "+KBw1GxPiZBSkrmt",
+                },
+                {
+                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                    username: "854bc4758e20cfe78cf64c95",
+                    credential: "+KBw1GxPiZBSkrmt",
+                },
+            ],
         });
 
         // ✅ If this peer is the initiator, create data channel
