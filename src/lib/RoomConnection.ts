@@ -108,7 +108,7 @@ export class RoomConnection {
     }
     
 
-    // DEFAULT ON PEER ADDED
+    // DEFAULT PEER TO ADD
     private defaultCreatePeer = async (peerId: string, selfDescription: string) => {
         console.log("Default onPeerAdded called");
         const peerConnection = new PeerConnection(peerId, selfDescription, this.defaultMediaStream!);
@@ -116,7 +116,11 @@ export class RoomConnection {
     }
 
     // CONNFIGURE PEER
-    private configurePeer = (peerConnection: PeerConnection, peer_id: string) => {
+    private configurePeer = (peerConnection: PeerConnection) => {
+
+        // Peer ID
+        const peer_id = peerConnection.id;
+
         // Set on ICE candidate
         peerConnection.pc.onicecandidate = (event) => {
             if (event.candidate) {
@@ -135,13 +139,16 @@ export class RoomConnection {
         peerConnection.pc.oniceconnectionstatechange = () => {
             console.log("ICE connection state changed:", peerConnection.pc.iceConnectionState);
             // Check if connection is closed
-            if (peerConnection.pc.iceConnectionState === "disconnected" || peerConnection.pc.iceConnectionState === "closed") {
-                console.log("ICE connection closed");
-                // Clean up peer connection
-                peerConnection.pc.close();
-                delete this.peerConnections[peer_id];
-                console.log("Peer connection removed:", peer_id);
-            }
+            // if (peerConnection.pc.iceConnectionState === "disconnected" || peerConnection.pc.iceConnectionState === "closed") {
+            //     console.log("ICE connection closed");
+            //     // Clean up peer connection
+            //     peerConnection.pc.close();
+            //     peerConnection.outboundMediaStream?.getTracks().forEach((track) => {
+            //         track.stop();
+            //     });
+            //     delete this.peerConnections[peer_id];
+            //     console.log("Peer connection removed:", peer_id);
+            // }
         }
 
         // On Connection State Change
@@ -152,6 +159,9 @@ export class RoomConnection {
                 console.log("Peer connection closed");
                 // Clean up peer connection
                 peerConnection.pc.close();
+                peerConnection.outboundMediaStream?.getTracks().forEach((track) => {
+                    track.stop();
+                });
                 delete this.peerConnections[peer_id];
                 console.log("Peer connection removed:", peer_id);
             }
@@ -170,7 +180,7 @@ export class RoomConnection {
         }
 
         // Configure peer connection
-        this.configurePeer(peerConnection, peer_id);
+        this.configurePeer(peerConnection);
         
         // Create offer
         const offer = await peerConnection.pc.createOffer();
@@ -214,7 +224,7 @@ export class RoomConnection {
         }
 
         // Configure peer connection
-        this.configurePeer(peerConnection, peer_id);
+        this.configurePeer(peerConnection);
 
         // Set remote and create answer
         await peerConnection.pc.setRemoteDescription(offer);
@@ -260,6 +270,9 @@ export class RoomConnection {
         Object.keys(this.peerConnections || {}).forEach((key) => {
             const peerConnection = this.peerConnections[key];
             peerConnection?.pc.close();
+            peerConnection.outboundMediaStream?.getTracks().forEach((track) => {
+                track.stop();
+            });
             delete this.peerConnections[key];
             console.log("Peer connection closed:", key);
         });
