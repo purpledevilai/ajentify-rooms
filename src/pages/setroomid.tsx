@@ -36,6 +36,11 @@ function SetRoomId() {
     navigate(`/translator-room/${roomId.trim()}`);
   };
 
+  const handleJoinAgentRoom = () => {
+    if (!roomId.trim()) return;
+    navigate(`/agent-room/${roomId.trim()}`);
+  }
+
   const handleResetRoom = async () => {
     if (!roomId.trim()) return;
 
@@ -110,6 +115,9 @@ function SetRoomId() {
             </Button>
             <Button width="100%" onClick={handleJoinTranslatorRoom} colorScheme="brand">
               Translator Room ✨
+            </Button>
+            <Button width="100%" onClick={handleJoinAgentRoom} colorScheme="brand">
+              Agent Room ✨
             </Button>
             <Box height={20}></Box>
             <Button

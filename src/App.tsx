@@ -4,6 +4,7 @@ import { AlertProvider } from "./components/AlertProvider";
 import SetRoomId from "./pages/setroomid";
 import RegularChatRoom from "./pages/regularchatroom";
 import TranslatorRoom from "./pages/translatorroom";
+import AgentRoom from "./pages/agentroom";
 
 const config: ThemeConfig = {
   initialColorMode: "dark",
@@ -105,6 +106,8 @@ function App() {
             <Route path="/room/:roomId" element={<RegularChatRoom />} />
             {/* Translator room route with dynamic param */}
             <Route path="/translator-room/:roomId" element={<TranslatorRoom />} />
+            {/* Agent room route with dynamic param */}
+            <Route path="/agent-room/:roomId" element={<AgentRoom />} />
             {/* Catch-all - Otherwise, remove or handle differently */}
             <Route path="*" element={<Navigate to="/set-room-id" replace />} />
           </Routes>
