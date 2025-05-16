@@ -3,7 +3,7 @@ import { ChakraProvider, extendTheme, ThemeConfig } from '@chakra-ui/react';
 import { AlertProvider } from "./components/AlertProvider";
 import SetRoomId from "./pages/setroomid";
 import RegularChatRoom from "./pages/regularchatroom";
-import TranslatorRoom from "./pages/translatorroom";
+//import TranslatorRoom from "./pages/translatorroom";
 import AgentRoom from "./pages/agentroom";
 
 const config: ThemeConfig = {
@@ -105,7 +105,7 @@ function App() {
             {/* Room route with dynamic param */}
             <Route path="/room/:roomId" element={<RegularChatRoom />} />
             {/* Translator room route with dynamic param */}
-            <Route path="/translator-room/:roomId" element={<TranslatorRoom />} />
+            {/* <Route path="/translator-room/:roomId" element={<TranslatorRoom />} /> */}
             {/* Agent room route with dynamic param */}
             <Route path="/agent-room/:roomId" element={<AgentRoom />} />
             {/* Catch-all - Otherwise, remove or handle differently */}

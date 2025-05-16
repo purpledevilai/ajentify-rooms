@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import {
@@ -22,6 +22,7 @@ const AgentRoom = observer(() => {
     const { roomId } = useParams();
     const navigate = useNavigate();
     const localVideoRef = useRef<HTMLVideoElement>(null);
+    const [isConnected, setIsConnected] = useState(false);
 
 
     const { colorMode, toggleColorMode } = useColorMode();
@@ -42,9 +43,16 @@ const AgentRoom = observer(() => {
             return;
         }
 
-        agentRoomStore.initialize(roomId)
+        const initialize = async () => {
+            await agentRoomStore.initialize(roomId)
+            console.log("connected to agent")
+            setIsConnected(true);
+        }
 
-    }, [roomId, navigate]);
+        initialize()
+        
+
+    }, [roomId, navigate, setIsConnected]);
 
 
     /**
@@ -139,6 +147,11 @@ const AgentRoom = observer(() => {
                 zIndex={1}
             >
                 <Text fontSize="lg" mb={4}>Agent Room ID: {roomId}</Text>
+
+                {/* Connection Status */}
+                <Text fontSize="sm" color={isConnected ? "green.500" : "red.500"}>
+                    {isConnected ? "Connected" : "Connecting..."}
+                </Text>
 
                 {/* Peer Video Elements */}
                 {agentRoomStore.roomConnection && <PeerVideoElements roomConnection={agentRoomStore.roomConnection} />}
