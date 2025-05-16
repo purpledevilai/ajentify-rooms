@@ -18,7 +18,6 @@ import {
   ModalBody,
   ModalFooter,
   Select,
-  Spinner,
 } from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 
@@ -35,16 +34,11 @@ function SetRoomId() {
 
   const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, onClose } = useDisclosure();
 
   const handleJoin = () => {
     if (!roomId.trim()) return;
     navigate(`/room/${roomId.trim()}`);
-  };
-
-  const handleJoinTranslatorRoom = () => {
-    if (!roomId.trim()) return;
-    navigate(`/translator-room/${roomId.trim()}`);
   };
 
   const handleJoinAgentRoom = async () => {
