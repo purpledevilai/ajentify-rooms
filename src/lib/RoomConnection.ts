@@ -12,6 +12,7 @@ export class RoomConnection {
     websocket: WebSocket | null = null;
     onPeerAdded: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
     onConnectionRequest: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
+    onPeerConnectionStateChanged?: (peerId: string, connected: boolean) => void;
     defaultMediaStream: MediaStream | null;
 
     constructor({
@@ -20,12 +21,14 @@ export class RoomConnection {
         onPeerAdded = this.defaultCreatePeer,
         onConnectionRequest = this.defaultCreatePeer,    
         defaultMediaStream = null,
+        onPeerConnectionStateChanged = undefined
     }: {
         id: string;
         selfDescription?: string;
         onPeerAdded?: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
         onConnectionRequest?: (peerId: string, selfDescription: string) => Promise<PeerConnection | null>;
         defaultMediaStream?: MediaStream | null;
+        onPeerConnectionStateChanged?: (peerId: string, connected: boolean) => void;
     }) {
         makeAutoObservable(this);
 
@@ -35,6 +38,7 @@ export class RoomConnection {
         this.peerConnections = {};
         this.onPeerAdded = onPeerAdded || this.defaultCreatePeer;
         this.onConnectionRequest = onConnectionRequest || this.defaultCreatePeer;
+        this.onPeerConnectionStateChanged = onPeerConnectionStateChanged;
         this.defaultMediaStream = defaultMediaStream;
 
         // Check that if there is no onPeerAdded that there must be a default media stream
@@ -138,22 +142,17 @@ export class RoomConnection {
         // On ICE Connection State Change
         peerConnection.pc.oniceconnectionstatechange = () => {
             console.log("ICE connection state changed:", peerConnection.pc.iceConnectionState);
-            // Check if connection is closed
-            // if (peerConnection.pc.iceConnectionState === "disconnected" || peerConnection.pc.iceConnectionState === "closed") {
-            //     console.log("ICE connection closed");
-            //     // Clean up peer connection
-            //     peerConnection.pc.close();
-            //     peerConnection.outboundMediaStream?.getTracks().forEach((track) => {
-            //         track.stop();
-            //     });
-            //     delete this.peerConnections[peer_id];
-            //     console.log("Peer connection removed:", peer_id);
-            // }
         }
 
         // On Connection State Change
         peerConnection.pc.onconnectionstatechange = () => {
             console.log("Connection state changed:", peerConnection.pc.connectionState);
+
+            // If connection state changed is definied, call it
+            if (this.onPeerConnectionStateChanged) {
+                this.onPeerConnectionStateChanged(peer_id, peerConnection.pc.connectionState === "connected");
+            }
+
             // Check if connection is closed
             if (peerConnection.pc.connectionState === "disconnected" || peerConnection.pc.connectionState === "closed") {
                 console.log("Peer connection closed");

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -20,6 +20,8 @@ import {
   Select,
 } from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
+import { getAccessToken } from "../api/_config/auth";
+import { getAgents } from "../api/agent/getAgents";
 
 // 🔧 Config: List of agents and their IDs
 const AGENTS = [
@@ -31,10 +33,36 @@ function SetRoomId() {
   const [roomId, setRoomId] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState(AGENTS[0].id);
   const [isCreatingContext, setIsCreatingContext] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
 
   const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onClose } = useDisclosure();
+
+  useEffect(() => {
+    // Check if user is logged in (replace with your actual login check logic)
+    const checkLoginStatus = async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setIsLoggedIn(false);
+          return;
+        }
+        setIsLoggedIn(true);
+        const agents = await getAgents();
+        setAgents(agents.map(agent => ({
+          id: agent.agent_id,
+          name: agent.agent_name,
+        })));
+      } catch (error) {
+        console.error("Error checking login status", error);
+        setIsLoggedIn(false);
+      }
+    }
+    checkLoginStatus();
+  }, []);
+      
 
   const handleJoin = () => {
     if (!roomId.trim()) return;
@@ -137,26 +165,34 @@ function SetRoomId() {
             </Text>
 
             {/* Agent Selector */}
-            <Select
-              mb={4}
-              value={selectedAgentId}
-              onChange={(e) => setSelectedAgentId(e.target.value)}
-            >
-              {AGENTS.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </Select>
-            <Button
-              width="100%"
-              onClick={handleJoinAgentRoom}
-              colorScheme="brand"
-              isLoading={isCreatingContext}
-              loadingText="Creating Agent Room..."
-            >
-              Agent Room ✨
-            </Button>
+            {isLoggedIn ? (
+              <>
+                <Select
+                  mb={4}
+                  value={selectedAgentId}
+                  onChange={(e) => setSelectedAgentId(e.target.value)}
+                >
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  width="100%"
+                  onClick={handleJoinAgentRoom}
+                  colorScheme="brand"
+                  isLoading={isCreatingContext}
+                  loadingText="Creating Agent Room..."
+                >
+                  Agent Room ✨
+                </Button>
+              </>
+            ) : (
+              <Button width="100%" colorScheme="blue" onClick={() => navigate("/login")}>
+                Login to see your agents
+              </Button>
+            )}
           </Flex>
         </Box>
       </Flex>

@@ -10,6 +10,7 @@ export class AgentRoomStore {
     mediaStream: MediaStream | undefined = undefined;
     audioMuted = false;
     videoMuted = false;
+    isConnected = false;
 
     constructor() {
         makeAutoObservable(this);
@@ -28,6 +29,7 @@ export class AgentRoomStore {
         this.mediaStream = undefined;
         this.audioMuted = false;
         this.videoMuted = false;
+        this.isConnected = false;
     }
 
     /**
@@ -64,6 +66,10 @@ export class AgentRoomStore {
             selfDescription: `Peer`,
             onPeerAdded: this.onPeerAdded,
             onConnectionRequest: this.onConnectionRequest,
+            onPeerConnectionStateChanged: (peerId: string, connected: boolean) => {
+                console.log(`Peer ${peerId} connection status changed: ${connected}`);
+                this.isConnected = connected;
+            }
         });
 
         // Join the room
@@ -91,6 +97,10 @@ export class AgentRoomStore {
     }
 
     onPeerAdded = async (peerId: string, selfDescription: string) => {
+        if (selfDescription === "Agent") {
+            // If the peer is an agent, we create a data channel
+            return await this.onPeerAddedOrConnectionRequest(peerId, selfDescription, true);
+        }
         return await this.onPeerAddedOrConnectionRequest(peerId, selfDescription, false);
     }
 

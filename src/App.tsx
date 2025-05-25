@@ -1,10 +1,21 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Amplify } from 'aws-amplify';
 import { ChakraProvider, extendTheme, ThemeConfig } from '@chakra-ui/react';
 import { AlertProvider } from "./components/AlertProvider";
+import LoginPage from "./pages/login";
 import SetRoomId from "./pages/setroomid";
 import RegularChatRoom from "./pages/regularchatroom";
 //import TranslatorRoom from "./pages/translatorroom";
 import AgentRoom from "./pages/agentroom";
+
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: import.meta.env.VITE_AWS_USER_POOL_ID?? '',
+      userPoolClientId: import.meta.env.VITE_AWS_USER_POOL_WEB_CLIENT_ID ?? '',
+    }
+  },
+})
 
 const config: ThemeConfig = {
   initialColorMode: "dark",
@@ -101,6 +112,9 @@ function App() {
           <Routes>
             {/* Default route: go to /set-room-id */}
             <Route path="/" element={<Navigate to="/set-room-id" replace />} />
+            {/* Login route */}
+            <Route path="/login" element={<LoginPage />} />
+            {/* Set Room ID route */}
             <Route path="/set-room-id" element={<SetRoomId />} />
             {/* Room route with dynamic param */}
             <Route path="/room/:roomId" element={<RegularChatRoom />} />
