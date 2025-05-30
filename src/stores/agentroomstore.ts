@@ -13,6 +13,11 @@ export class AgentRoomStore {
     audioMuted = false;
     videoMuted = false;
     isConnected = false;
+    isCalibrating = false;
+    isUserSpeaking = false;
+    currentDetectedSpeech: string | undefined = undefined;
+    aiMessages: { sentence: string; sentence_id: string }[] = [];
+    currentlySpeakingSentenceId: string | undefined = undefined;
     agentRPCLayer: JSONRPCPeer | undefined = undefined;
     onLocalVolumeChange: ((volume: number) => void) | undefined = undefined;
     onInboundVolumeChange: ((peerId: string, volume: number) => void) | undefined = undefined;
@@ -158,6 +163,35 @@ export class AgentRoomStore {
             this.onInboundVolumeChange?.(peerId, volume);
         });
         this.agentRPCLayer = new JSONRPCPeer(peer.sendMessage)
+
+        this.agentRPCLayer.on("data_channel_connection_status", ({status}) => {
+            console.log(`Data channel connection status for peer ${peerId}:`, status);
+            this.isConnected = status === "connected";
+        });
+        this.agentRPCLayer.on("calibration_status", ({status}) => {
+            console.log(`Calibration status for peer ${peerId}:`, status);
+            this.isCalibrating = status === "started";
+        });
+        this.agentRPCLayer.on("is_speaking_status", ({is_speaking}) => {
+            console.log(`Is speaking status for peer ${peerId}:`, is_speaking);
+            this.isUserSpeaking = is_speaking;
+        });
+        this.agentRPCLayer.on("speech_detected", ({text}) => {
+            console.log(`Speech detected from peer ${peerId}:`, text);
+            this.currentDetectedSpeech = text;
+        });
+        this.agentRPCLayer.on("ai_sentence", ({sentence, sentence_id}) => {
+            console.log(`AI sentence from peer ${peerId}:`, sentence, sentence_id);
+            this.aiMessages.push({ sentence, sentence_id });
+        });
+        this.agentRPCLayer.on("is_speaking_sentence", ({sentence_id}) => {
+            console.log(`AI is speaking sentence from peer ${peerId}:`, sentence_id);
+            this.currentlySpeakingSentenceId = sentence_id;
+        })
+        this.agentRPCLayer.on("stoped_speaking", () => {
+            console.log(`AI stopped speaking from peer ${peerId}`);
+            this.currentlySpeakingSentenceId = undefined;
+        });
         peer.setOnDataChannelMessage(this.agentRPCLayer.handleMessage)
         
         return peer
