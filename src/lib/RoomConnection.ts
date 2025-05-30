@@ -86,7 +86,7 @@ export class RoomConnection {
             this.websocket.onclose = () => {
                 console.log("WebSocket closed");
                 for (const key in this.peerConnections) {
-                    this.peerConnections[key].pc.close();
+                    this.peerConnections[key].pc?.close();
                     delete this.peerConnections[key];
                 }
             };
@@ -125,6 +125,13 @@ export class RoomConnection {
         // Peer ID
         const peer_id = peerConnection.id;
 
+        // Initialize peer connection
+        peerConnection.initialize();
+
+        if (!peerConnection.pc) {
+            throw new Error("PeerConnection is not initialized");
+        }
+
         // Set on ICE candidate
         peerConnection.pc.onicecandidate = (event) => {
             if (event.candidate) {
@@ -141,16 +148,22 @@ export class RoomConnection {
 
         // On ICE Connection State Change
         peerConnection.pc.oniceconnectionstatechange = () => {
-            console.log("ICE connection state changed:", peerConnection.pc.iceConnectionState);
+            console.log("ICE connection state changed:", peerConnection.pc!.iceConnectionState);
         }
 
         // On Connection State Change
         peerConnection.pc.onconnectionstatechange = () => {
+
+            if (!peerConnection.pc) {
+                console.error("PeerConnection is not initialized");
+                return;
+            }
+
             console.log("Connection state changed:", peerConnection.pc.connectionState);
 
             // If connection state changed is definied, call it
             if (this.onPeerConnectionStateChanged) {
-                this.onPeerConnectionStateChanged(peer_id, peerConnection.pc.connectionState === "connected");
+                this.onPeerConnectionStateChanged(peer_id, peerConnection.pc!.connectionState === "connected");
             }
 
             // Check if connection is closed
@@ -180,6 +193,11 @@ export class RoomConnection {
 
         // Configure peer connection
         this.configurePeer(peerConnection);
+
+        // Check if pc is initialized
+        if (!peerConnection.pc) {
+            throw new Error("PeerConnection is not initialized");
+        }
         
         // Create offer
         const offer = await peerConnection.pc.createOffer();
@@ -225,6 +243,11 @@ export class RoomConnection {
         // Configure peer connection
         this.configurePeer(peerConnection);
 
+        // Check if pc is initialized
+        if (!peerConnection.pc) {
+            throw new Error("PeerConnection is not initialized");
+        }
+
         // Set remote and create answer
         await peerConnection.pc.setRemoteDescription(offer);
         const answer = await peerConnection.pc.createAnswer();
@@ -256,7 +279,7 @@ export class RoomConnection {
         const peer = this.peerConnections[peer_id];
         if (peer) {
             console.log("Adding ICE candidate:", params);
-            await peer.pc.addIceCandidate(candidate);
+            await peer.pc?.addIceCandidate(candidate);
         } else {
             console.log("ICE Peer not found:", peer_id);
         }
@@ -268,7 +291,7 @@ export class RoomConnection {
         // Close all peer connections
         Object.keys(this.peerConnections || {}).forEach((key) => {
             const peerConnection = this.peerConnections[key];
-            peerConnection?.pc.close();
+            peerConnection.pc?.close();
             peerConnection.outboundMediaStream?.getTracks().forEach((track) => {
                 track.stop();
             });

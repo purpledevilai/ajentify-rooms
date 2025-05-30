@@ -43,6 +43,14 @@ const AgentRoom = observer(() => {
         }
 
         const initialize = async () => {
+            agentRoomStore.setOnInboundVolumeChange((peerId, volume) => {
+                // Handle volume change for animations or UI updates
+                console.log(`Inbound volume for peer ${peerId}:`, volume);
+            });
+            agentRoomStore.setOnLocalVolumeChange((volume) => {
+                // Handle volume change for animations or UI updates
+                //console.log(`Outbound volume for room ${roomId}:`, volume);
+            });
             await agentRoomStore.initialize(roomId)
         }
 

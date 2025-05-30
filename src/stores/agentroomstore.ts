@@ -2,6 +2,8 @@ import { makeAutoObservable } from "mobx";
 import { mediaDeviceStore } from "./mediadevicestore";
 import { RoomConnection } from "../lib/RoomConnection";
 import { PeerConnection } from "../lib/PeerConnection";
+import { JSONRPCPeer } from "../lib/JSONRPCPeer";
+import { monitorMicStream } from "../lib/monitorMediaStreams";
 
 export class AgentRoomStore {
     roomConnection: RoomConnection | undefined = undefined;
@@ -11,6 +13,9 @@ export class AgentRoomStore {
     audioMuted = false;
     videoMuted = false;
     isConnected = false;
+    agentRPCLayer: JSONRPCPeer | undefined = undefined;
+    onLocalVolumeChange: ((volume: number) => void) | undefined = undefined;
+    onInboundVolumeChange: ((peerId: string, volume: number) => void) | undefined = undefined;
 
     constructor() {
         makeAutoObservable(this);
@@ -30,6 +35,14 @@ export class AgentRoomStore {
         this.audioMuted = false;
         this.videoMuted = false;
         this.isConnected = false;
+    }
+
+    setOnLocalVolumeChange(callback: (volume: number) => void) {
+        this.onLocalVolumeChange = callback;
+    }
+
+    setOnInboundVolumeChange(callback: (peerId: string, volume: number) => void) {
+        this.onInboundVolumeChange = callback;
     }
 
     /**
@@ -135,7 +148,18 @@ export class AgentRoomStore {
             video: videoConstraints,
             audio: audioConstraints,
         });
-        const peer = new PeerConnection(peerId, selfDescription, mediaStream, createDataChanel, this.onMessageReceived);
+
+        monitorMicStream(mediaStream, (volume) => {
+            this.onLocalVolumeChange?.(volume);
+        });
+        
+        const peer = new PeerConnection(peerId, selfDescription, mediaStream, createDataChanel);
+        peer.setOnVolumeChange((volume) => {
+            this.onInboundVolumeChange?.(peerId, volume);
+        });
+        this.agentRPCLayer = new JSONRPCPeer(peer.sendMessage)
+        peer.setOnDataChannelMessage(this.agentRPCLayer.handleMessage)
+        
         return peer
     }
 
@@ -223,7 +247,7 @@ export class AgentRoomStore {
     
         // Replace in each peer connection
         for (const peerConnection of Object.values(this.roomConnection?.peerConnections || {})) {
-            const sender = peerConnection.pc.getSenders().find(
+            const sender = peerConnection.pc?.getSenders().find(
                 (s) => s.track?.kind === newTrack.kind
             );
             if (sender) {

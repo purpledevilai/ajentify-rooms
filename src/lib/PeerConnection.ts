@@ -1,26 +1,39 @@
 import { makeAutoObservable } from "mobx";
+import { monitorInboundMediaStream } from "./monitorMediaStreams";
 
 export class PeerConnection {
     id: string;
     selfDescription: string;
-    outboundMediaStream: MediaStream | null = null;
-    pc: RTCPeerConnection;
-    inboundMediaStream: MediaStream | null = null;
-    dataChannel: RTCDataChannel | null = null;
+    outboundMediaStream: MediaStream | undefined = undefined;
+    pc: RTCPeerConnection | undefined = undefined;
+    inboundMediaStream: MediaStream | undefined = undefined;
+    createDataChannel: boolean = false;
+    dataChannel: RTCDataChannel | undefined = undefined;
+    onMessageCallback: ((message: string) => void) | undefined = undefined;
+    onVolumeChangeCallback: ((volume: number) => void) | undefined = undefined;
 
     constructor(
         id: string,
         selfDescription: string,
         outboundMediaStream: MediaStream,
         createDataChannel: boolean = false,
-        onMessageCallback: (message: string) => void = () => { }
     ) {
         makeAutoObservable(this);
-
         this.id = id;
         this.selfDescription = selfDescription;
         this.outboundMediaStream = outboundMediaStream;
+        this.createDataChannel = createDataChannel;
+    }
 
+    setOnDataChannelMessage(callback: (message: string) => void) {
+        this.onMessageCallback = callback;
+    }
+
+    setOnVolumeChange(callback: (volume: number) => void) {
+        this.onVolumeChangeCallback = callback;
+    }
+
+    initialize() {
         this.pc = new RTCPeerConnection({
             iceServers: [
                 {
@@ -50,7 +63,7 @@ export class PeerConnection {
         });
 
         // ✅ If this peer is the initiator, create data channel
-        if (createDataChannel) {
+        if (this.createDataChannel) {
             this.dataChannel = this.pc.createDataChannel("chat");
 
             this.dataChannel.onopen = () => {
@@ -59,7 +72,7 @@ export class PeerConnection {
 
             this.dataChannel.onmessage = (event) => {
                 console.log(`[${this.id}] Received message:`, event.data);
-                if (onMessageCallback) onMessageCallback(event.data);
+                if (this.onMessageCallback) this.onMessageCallback(event.data);
             };
         }
 
@@ -74,7 +87,7 @@ export class PeerConnection {
 
             this.dataChannel.onmessage = (event) => {
                 console.log(`[${this.id}] Received message from remote:`, event.data);
-                if (onMessageCallback) onMessageCallback(event.data);
+                if (this.onMessageCallback) this.onMessageCallback(event.data);
             };
         };
 
@@ -82,12 +95,15 @@ export class PeerConnection {
             console.log("Received Track Event:", event);
             const [newStream] = event.streams;
             this.inboundMediaStream = newStream;
+            monitorInboundMediaStream(newStream, (volume) => {
+                this.onVolumeChangeCallback?.(volume);
+            });
         };
 
         // Add local media tracks
-        this.outboundMediaStream.getTracks().forEach((track) => {
+        this.outboundMediaStream?.getTracks().forEach((track) => {
             console.log("Adding local track:", track);
-            this.pc.addTrack(track, this.outboundMediaStream!);
+            this.pc?.addTrack(track, this.outboundMediaStream!);
         });
     }
 
@@ -99,4 +115,6 @@ export class PeerConnection {
             console.warn(`[${this.id}] Data channel not ready`);
         }
     }
+
+    
 }
