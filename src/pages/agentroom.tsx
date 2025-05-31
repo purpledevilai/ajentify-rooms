@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import {
     Box,
     Flex,
+    Spinner,
     Text,
     VStack,
     useColorModeValue,
@@ -11,6 +12,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { agentRoomStore } from "../stores/agentroomstore";
 import { MediaStreamAudio } from "./components/MediaStreamAudio";
 import { MediaStreamVideo } from "./components/MediaStreamVideo";
+import { ChevronLeftIcon } from "@chakra-ui/icons";
 
 const BASE_ORB_SIZE = 50;
 const ORB_CONTAINER_HEIGHT = 160;
@@ -87,7 +89,7 @@ const AgentRoomView = observer(() => {
     return (
         <Box position="relative" h="100vh" w="100vw" bg={bg} color={text}>
             {/* Calibration Overlay */}
-            {agentRoomStore.isCalibrating && (
+            {(agentRoomStore.isCalibrating || agentRoomStore.isConnecting) && (
                 <Flex
                     position="absolute"
                     top={0}
@@ -97,13 +99,47 @@ const AgentRoomView = observer(() => {
                     align="center"
                     justify="center"
                     bg="rgba(0,0,0,0.6)"
+                    px={6}
                     zIndex={10}
                 >
-                    <Text fontSize="2xl" color="white">
-                        Calibrating... Please do not speak
+                    <Text
+                        position="relative"
+                        top="-80px"
+                        fontSize="xl"
+                        fontWeight="bold"
+                        color="white"
+                        opacity={agentRoomStore.isConnecting ? 0 : 1}
+                        transition="opacity 1s ease"
+                        textAlign="center"
+                    >
+                        Don’t Speak...<br />Measuring ambient noise
                     </Text>
                 </Flex>
             )}
+
+            {/* End Call Button */}
+            <Box
+                position="absolute"
+                top="16px"
+                left="16px"
+                zIndex={2}
+                borderRadius="full"
+                boxShadow="md"
+                p={2}
+                cursor="pointer"
+                onClick={() => {
+                    agentRoomStore.leaveRoom();
+                    navigate("/");
+                }}
+                display="flex"
+                alignItems="center"
+                gap={2}
+            >
+                <ChevronLeftIcon boxSize={5} />
+                <Text fontSize="lg" fontWeight="bold">
+                    End Call
+                </Text>
+            </Box>
 
             {/* Local Video */}
             <Box
@@ -122,37 +158,6 @@ const AgentRoomView = observer(() => {
                     stream={agentRoomStore.mediaStream}
                     muted={true}
                 />
-            </Box>
-
-            {/* Center Orb */}
-            <Box
-                position="absolute"
-                top="50%"
-                left="50%"
-                transform="translate(-50%, -50%)"
-                w="100%"
-                maxW="600px"
-                h={`${ORB_CONTAINER_HEIGHT}px`}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                zIndex={1}
-            >
-                <Box
-                    w={`${BASE_ORB_SIZE + Math.max(localVolume, remoteVolume)}px`}
-                    h={`${BASE_ORB_SIZE + Math.max(localVolume, remoteVolume)}px`}
-                    borderRadius="50%"
-                    bg={orbColor}
-                    transition="all 0.1s ease"
-                    boxShadow="0 0 40px rgba(0,0,0,0.2)"
-                >
-                    <MediaStreamAudio
-                        stream={
-                            Object.values(agentRoomStore.roomConnection?.peerConnections || {})[0]
-                                ?.inboundMediaStream
-                        }
-                    />
-                </Box>
             </Box>
 
             {/* Top Speech */}
@@ -179,6 +184,44 @@ const AgentRoomView = observer(() => {
                     {visibleSpeech || " "}
                 </Text>
             </Box>
+
+            {/* Center Orb */}
+            <Box
+                position="absolute"
+                top="50%"
+                left="50%"
+                transform="translate(-50%, -50%)"
+                w="100%"
+                maxW="600px"
+                h={`${ORB_CONTAINER_HEIGHT}px`}
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                zIndex={1}
+            >
+                {agentRoomStore.isConnecting ? (
+                    <Spinner
+                        size="xl"
+                    />
+                ) : (
+                    <Box
+                        w={`${BASE_ORB_SIZE + Math.max(localVolume, remoteVolume)}px`}
+                        h={`${BASE_ORB_SIZE + Math.max(localVolume, remoteVolume)}px`}
+                        borderRadius="50%"
+                        bg={orbColor}
+                        transition="all 0.1s ease"
+                        boxShadow="0 0 40px rgba(0,0,0,0.2)"
+                    >
+                        <MediaStreamAudio
+                            stream={
+                                Object.values(agentRoomStore.roomConnection?.peerConnections || {})[0]
+                                    ?.inboundMediaStream
+                            }
+                        />
+                    </Box>
+                )}
+            </Box>
+
 
             {/* Bottom Messages */}
             <Box

@@ -154,7 +154,7 @@ export class RegularChatRoomStore {
 
         // Replace in each peer connection
         for (const peerConnection of Object.values(this.roomConnection?.peerConnections || {})) {
-            const sender = peerConnection.pc.getSenders().find(
+            const sender = peerConnection.pc?.getSenders().find(
                 (s) => s.track?.kind === newTrack.kind
             );
             if (sender) {

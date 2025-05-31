@@ -128,7 +128,7 @@ export class TranslatorRoomStore {
             video: videoConstraints,
             audio: audioConstraints,
         });
-        const peer = new PeerConnection(peerId, selfDescription, mediaStream, createDataChanel, this.onMessageReceived);
+        const peer = new PeerConnection(peerId, selfDescription, mediaStream, createDataChanel);
         return peer
     }
 
@@ -217,7 +217,7 @@ export class TranslatorRoomStore {
     
         // Replace in each peer connection
         for (const peerConnection of Object.values(this.roomConnection?.peerConnections || {})) {
-            const sender = peerConnection.pc.getSenders().find(
+            const sender = peerConnection.pc?.getSenders().find(
                 (s) => s.track?.kind === newTrack.kind
             );
             if (sender) {

@@ -34,6 +34,7 @@ function SetRoomId() {
   const [selectedAgentId, setSelectedAgentId] = useState(AGENTS[0].id);
   const [isCreatingContext, setIsCreatingContext] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(true);
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
 
   const navigate = useNavigate();
@@ -50,6 +51,7 @@ function SetRoomId() {
           return;
         }
         setIsLoggedIn(true);
+        setIsLoadingAgents(true)
         const agents = await getAgents();
         setAgents(agents.map(agent => ({
           id: agent.agent_id,
@@ -57,12 +59,13 @@ function SetRoomId() {
         })));
       } catch (error) {
         console.error("Error checking login status", error);
-        setIsLoggedIn(false);
+      } finally {
+        setIsLoadingAgents(false);
       }
     }
     checkLoginStatus();
   }, []);
-      
+
 
   const handleJoin = () => {
     if (!roomId.trim()) return;
@@ -167,17 +170,23 @@ function SetRoomId() {
             {/* Agent Selector */}
             {isLoggedIn ? (
               <>
-                <Select
-                  mb={4}
-                  value={selectedAgentId}
-                  onChange={(e) => setSelectedAgentId(e.target.value)}
-                >
-                  {agents.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </option>
-                  ))}
-                </Select>
+                {isLoadingAgents ? (
+                  <Text fontSize="sm" textAlign="center" color="gray.500">
+                    Loading agents...
+                  </Text>
+                ) : (
+                  <Select
+                    mb={4}
+                    value={selectedAgentId}
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                  >
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
                 <Button
                   width="100%"
                   onClick={handleJoinAgentRoom}

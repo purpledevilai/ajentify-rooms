@@ -12,6 +12,7 @@ export class AgentRoomStore {
     mediaStream: MediaStream | undefined = undefined;
     audioMuted = false;
     videoMuted = false;
+    isConnecting = true;
     isConnected = false;
     isCalibrating = false;
     isUserSpeaking = false;
@@ -40,7 +41,15 @@ export class AgentRoomStore {
         this.mediaStream = undefined;
         this.audioMuted = false;
         this.videoMuted = false;
+        this.isConnecting = true;
         this.isConnected = false;
+        this.isCalibrating = false;
+        this.isUserSpeaking = false;
+        this.currentDetectedSpeech = undefined;
+        this.aiMessages = [];
+        this.currentlySpeakingSentenceId = undefined;
+        this.agentRPCLayer = undefined;
+        this.showAIMessages = true;
     }
 
     setOnLocalVolumeChange(callback: (volume: number) => void) {
@@ -88,6 +97,7 @@ export class AgentRoomStore {
             onPeerConnectionStateChanged: (peerId: string, connected: boolean) => {
                 console.log(`Peer ${peerId} connection status changed: ${connected}`);
                 this.isConnected = connected;
+                this.isConnecting = !connected;
             }
         });
 
