@@ -19,6 +19,7 @@ export class AgentRoomStore {
     aiMessages: { sentence: string; sentence_id: string }[] = [];
     currentlySpeakingSentenceId: string | undefined = undefined;
     agentRPCLayer: JSONRPCPeer | undefined = undefined;
+    showAIMessages = true;
     onLocalVolumeChange: ((volume: number) => void) | undefined = undefined;
     onInboundVolumeChange: ((peerId: string, volume: number) => void) | undefined = undefined;
 
@@ -183,6 +184,7 @@ export class AgentRoomStore {
         this.agentRPCLayer.on("ai_sentence", ({sentence, sentence_id}) => {
             console.log(`AI sentence from peer ${peerId}:`, sentence, sentence_id);
             this.aiMessages.push({ sentence, sentence_id });
+            this.showAIMessages = true;
         });
         this.agentRPCLayer.on("is_speaking_sentence", ({sentence_id}) => {
             console.log(`AI is speaking sentence from peer ${peerId}:`, sentence_id);
@@ -191,6 +193,12 @@ export class AgentRoomStore {
         this.agentRPCLayer.on("stoped_speaking", () => {
             console.log(`AI stopped speaking from peer ${peerId}`);
             this.currentlySpeakingSentenceId = undefined;
+            this.currentDetectedSpeech = undefined;
+            this.showAIMessages = false;
+            // Set a timer to clear aiMessages after 5 seconds
+            setTimeout(() => {
+                this.aiMessages = [];
+            }, 2000);
         });
         peer.setOnDataChannelMessage(this.agentRPCLayer.handleMessage)
         

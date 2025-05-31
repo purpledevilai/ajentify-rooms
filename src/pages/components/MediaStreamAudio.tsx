@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 interface MediaStreamAudioProps {
-    stream: MediaStream | null;
+    stream: MediaStream | undefined;
     muted?: boolean;
 }
 
@@ -38,7 +38,6 @@ export const MediaStreamAudio = ({ stream, muted = false }: MediaStreamAudioProp
         autoPlay
         playsInline
         muted={muted}
-        controls
         style={{
             width: "100%",
         }}

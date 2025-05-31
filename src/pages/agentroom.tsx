@@ -1,38 +1,39 @@
-import { useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import {
     Box,
     Flex,
     Text,
-    IconButton,
-    useColorMode,
+    VStack,
     useColorModeValue,
-    HStack,
-    Select,
-    Tooltip,
 } from "@chakra-ui/react";
-import { SunIcon, MoonIcon } from "@chakra-ui/icons";
-import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-icons/fa";
+import { useNavigate, useParams } from "react-router-dom";
 import { agentRoomStore } from "../stores/agentroomstore";
-import { mediaDeviceStore } from "../stores/mediadevicestore";
-import { PeerVideoElements } from "./components/PeerVideoElements";
+import { MediaStreamAudio } from "./components/MediaStreamAudio";
+import { MediaStreamVideo } from "./components/MediaStreamVideo";
 
-const AgentRoom = observer(() => {
+const BASE_ORB_SIZE = 50;
+const ORB_CONTAINER_HEIGHT = 160;
+
+const AgentRoomView = observer(() => {
     const { roomId } = useParams();
     const navigate = useNavigate();
-    const localVideoRef = useRef<HTMLVideoElement>(null);
+    const [localVolume, setLocalVolume] = useState(0);
+    const [remoteVolume, setRemoteVolume] = useState(0);
+    const [orbColor, setOrbColor] = useState("gray.400");
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const hasInitialized = useRef(false);
 
+    const topOffset = `calc(50% - ${ORB_CONTAINER_HEIGHT / 2}px)`;
+    const bottomOffset = `calc(50% + ${ORB_CONTAINER_HEIGHT / 2}px)`;
 
-    const { colorMode, toggleColorMode } = useColorMode();
     const bg = useColorModeValue("gray.100", "gray.900");
     const text = useColorModeValue("gray.800", "white");
-    const controlBarBg = useColorModeValue("rgba(255,255,255,0.8)", "rgba(0,0,0,0.7)");
 
-    /**
-     * Initialize the room and media devices, or navigate to set-room-id if no roomId is provided
-     */
-    const hasInitialized = useRef(false);
+    const [visibleSpeech, setVisibleSpeech] = useState<string | null>(null);
+    const [speechVisible, setSpeechVisible] = useState(false);
+
+    // Init room
     useEffect(() => {
         if (hasInitialized.current) return;
         hasInitialized.current = true;
@@ -43,197 +44,184 @@ const AgentRoom = observer(() => {
         }
 
         const initialize = async () => {
-            agentRoomStore.setOnInboundVolumeChange((peerId, volume) => {
-                // Handle volume change for animations or UI updates
-                //console.log(`Inbound volume for peer ${peerId}:`, volume);
-            });
-            agentRoomStore.setOnLocalVolumeChange((volume) => {
-                // Handle volume change for animations or UI updates
-                //console.log(`Outbound volume for room ${roomId}:`, volume);
-            });
-            await agentRoomStore.initialize(roomId)
-        }
+            agentRoomStore.setOnInboundVolumeChange((_, volume) => setRemoteVolume(volume));
+            agentRoomStore.setOnLocalVolumeChange(setLocalVolume);
+            await agentRoomStore.initialize(roomId);
+        };
 
-        initialize()
-        
+        initialize();
 
+        return () => agentRoomStore.reset();
     }, [roomId, navigate]);
 
-
-    /**
-     * on navigate away from this page, reset the store
-     */
+    // Orb color logic
     useEffect(() => {
-        return () => {
-            console.log("Cleaning up regular chat room on unmount");
-            agentRoomStore.reset();
-        };
-    }, []);
+        setOrbColor(
+            agentRoomStore.isUserSpeaking
+                ? "blue.400"
+                : agentRoomStore.currentlySpeakingSentenceId
+                    ? "green.400"
+                    : "gray.400"
+        );
+    }, [agentRoomStore.isUserSpeaking, agentRoomStore.currentlySpeakingSentenceId]);
 
-
-    /**
-     * Set the local video/adio src when the mediaStream changes
-     */
+    // Scroll active sentence into view
     useEffect(() => {
-        if (localVideoRef.current && agentRoomStore.mediaStream) {
-            localVideoRef.current.srcObject = agentRoomStore.mediaStream;
+        const id = agentRoomStore.currentlySpeakingSentenceId;
+        if (scrollRef.current && id) {
+            const el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-    }, [agentRoomStore.mediaStream]);
+    }, [agentRoomStore.currentlySpeakingSentenceId]);
 
-
-
-    /**
-     * Handle Leaving the room
-     */
-    const handleLeave = () => {
-        agentRoomStore.leaveRoom();
-        if (localVideoRef.current) {
-            localVideoRef.current.srcObject = null;
+    // Whenever a new detected speech comes in
+    useEffect(() => {
+        if (agentRoomStore.currentDetectedSpeech) {
+            setVisibleSpeech(agentRoomStore.currentDetectedSpeech);
+            setSpeechVisible(true);
+        } else {
+            setSpeechVisible(false);
         }
-        navigate("/set-room-id");
-    };
+    }, [agentRoomStore.currentDetectedSpeech]);
 
-    /**
-     * View
-     */
     return (
-        <Box position="relative" height="100vh" width="100vw" overflow="hidden" bg={bg} color={text}>
-            {/* Color Mode Toggle (Top-Right Overlay) */}
-            <IconButton
-                icon={colorMode === "light" ? <MoonIcon /> : <SunIcon />}
-                aria-label="Toggle color mode"
-                onClick={toggleColorMode}
-                position="absolute"
-                top="16px"
-                left="16px" // Adjusted to not overlap local video
-                zIndex={3}
-                variant="ghost"
-            />
+        <Box position="relative" h="100vh" w="100vw" bg={bg} color={text}>
+            {/* Calibration Overlay */}
+            {agentRoomStore.isCalibrating && (
+                <Flex
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    w="100%"
+                    h="100%"
+                    align="center"
+                    justify="center"
+                    bg="rgba(0,0,0,0.6)"
+                    zIndex={10}
+                >
+                    <Text fontSize="2xl" color="white">
+                        Calibrating... Please do not speak
+                    </Text>
+                </Flex>
+            )}
 
-            {/* Local Video (Top-Right Overlay) */}
+            {/* Local Video */}
             <Box
                 position="absolute"
                 top="16px"
                 right="16px"
-                width="200px"
-                height="120px"
-                zIndex={2}
-                borderRadius="md"
+                w="120px"
+                h="120px"
+                borderRadius="20px"
                 overflow="hidden"
                 boxShadow="lg"
                 bg="black"
+                zIndex={2}
             >
-                <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        transform: "scaleX(-1)",
-                    }}
+                <MediaStreamVideo
+                    stream={agentRoomStore.mediaStream}
+                    muted={true}
                 />
             </Box>
 
-            {/* Peer Videos Scroll Area (Centered Main View) */}
-            <Flex
-                direction="column"
-                align="center"
-                justify="start"
-                height="100%"
-                gap={4}
-                px={4}
-                pt="160px"
-                pb="200px"
-                overflowY="auto"
-                position="relative"
-                zIndex={1}
-            >
-                <Text fontSize="lg" mb={4}>Agent Room ID: {roomId}</Text>
-
-                {/* Connection Status */}
-                <Text fontSize="sm" color={agentRoomStore.isConnected ? "green.500" : "red.500"}>
-                    {agentRoomStore.isConnected ? "Connected" : "Connecting..."}
-                </Text>
-
-                {/* Peer Video Elements */}
-                {agentRoomStore.roomConnection && <PeerVideoElements roomConnection={agentRoomStore.roomConnection} />}
-
-            </Flex>
-
-            {/* Control Bar (Bottom Overlay) */}
+            {/* Center Orb */}
             <Box
                 position="absolute"
-                bottom="0"
-                width="100%"
-                bg={controlBarBg}
-                backdropFilter="blur(6px)"
-                py={3}
-                px={4}
-                zIndex={2}
+                top="50%"
+                left="50%"
+                transform="translate(-50%, -50%)"
+                w="100%"
+                maxW="600px"
+                h={`${ORB_CONTAINER_HEIGHT}px`}
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                zIndex={1}
             >
-                <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
-                    {/* Audio Controls */}
-                    <HStack spacing={2}>
-                        <Tooltip label="Mute / Unmute Microphone">
-                            <IconButton
-                                aria-label="Toggle Mute Audio"
-                                icon={agentRoomStore.audioMuted ? <FaMicrophoneSlash /> : <FaMicrophone />}
-                                onClick={() => agentRoomStore.toggleMediaDeviceMute("audio")}
-                            />
-                        </Tooltip>
-                        <Select
-                            placeholder="Select Microphone"
-                            value={agentRoomStore.selectedAudioDevice?.deviceId ?? ""}
-                            onChange={(e) => agentRoomStore.setMediaDevice(e.target.value, "audio")}
-                            maxW="200px"
-                        >
-                            {mediaDeviceStore.audioDevices.map((device) => (
-                                <option key={device.deviceId} value={device.deviceId}>
-                                    {device.label || `Mic ${device.deviceId.slice(-4)}`}
-                                </option>
-                            ))}
-                        </Select>
-                    </HStack>
+                <Box
+                    w={`${BASE_ORB_SIZE + Math.max(localVolume, remoteVolume)}px`}
+                    h={`${BASE_ORB_SIZE + Math.max(localVolume, remoteVolume)}px`}
+                    borderRadius="50%"
+                    bg={orbColor}
+                    transition="all 0.1s ease"
+                    boxShadow="0 0 40px rgba(0,0,0,0.2)"
+                >
+                    <MediaStreamAudio
+                        stream={
+                            Object.values(agentRoomStore.roomConnection?.peerConnections || {})[0]
+                                ?.inboundMediaStream
+                        }
+                    />
+                </Box>
+            </Box>
 
-                    {/* Video Controls */}
-                    <HStack spacing={2}>
-                        <Tooltip label="Toggle Camera">
-                            <IconButton
-                                aria-label="Toggle Mute Video"
-                                icon={agentRoomStore.videoMuted ? <FaVideoSlash /> : <FaVideo />}
-                                onClick={() => agentRoomStore.toggleMediaDeviceMute("video")}
-                            />
-                        </Tooltip>
-                        <Select
-                            placeholder="Select Camera"
-                            value={agentRoomStore.selectedVideoDevice?.deviceId ?? ""}
-                            onChange={(e) => agentRoomStore.setMediaDevice(e.target.value, "video")}
-                            maxW="200px"
-                        >
-                            {mediaDeviceStore.videoDevices.map((device) => (
-                                <option key={device.deviceId} value={device.deviceId}>
-                                    {device.label || `Cam ${device.deviceId.slice(-4)}`}
-                                </option>
-                            ))}
-                        </Select>
-                    </HStack>
+            {/* Top Speech */}
+            <Box
+                position="absolute"
+                top={0}
+                left="50%"
+                transform="translateX(-50%)"
+                h={topOffset}
+                w="100%"
+                maxW="600px"
+                display="flex"
+                alignItems="flex-end"
+                justifyContent="center"
+                textAlign="center"
+                px={4}
+                zIndex={1}
+            >
+                <Text
+                    fontSize="md"
+                    opacity={speechVisible ? 1 : 0}
+                    transition="opacity 0.5s ease"
+                >
+                    {visibleSpeech || " "}
+                </Text>
+            </Box>
 
-                    <Text
-                        as="button"
-                        onClick={handleLeave}
-                        color="red.400"
-                        _hover={{ color: "red.600" }}
-                        fontWeight="bold"
-                    >
-                        Leave Call
-                    </Text>
-                </Flex>
+            {/* Bottom Messages */}
+            <Box
+                position="absolute"
+                top={bottomOffset}
+                left="50%"
+                transform="translateX(-50%)"
+                w="100%"
+                maxW="600px"
+                maxH="200px"
+                px={8}
+                py={4}
+                overflowY="auto"
+                ref={scrollRef}
+                zIndex={1}
+                opacity={agentRoomStore.showAIMessages ? 1 : 0}
+                transition="opacity 0.5s ease"
+            >
+                <VStack spacing={2}>
+                    {agentRoomStore.aiMessages.map(({ sentence, sentence_id }) => (
+                        <Text
+                            key={sentence_id}
+                            id={sentence_id}
+                            fontWeight={
+                                agentRoomStore.currentlySpeakingSentenceId === sentence_id
+                                    ? "bold"
+                                    : "normal"
+                            }
+                            fontSize="md"
+                            opacity={
+                                agentRoomStore.currentlySpeakingSentenceId === sentence_id
+                                    ? 1
+                                    : 0.5
+                            }
+                            transition="opacity 0.2s ease"
+                        >
+                            {sentence}
+                        </Text>
+                    ))}
+                </VStack>
             </Box>
         </Box>
     );
 });
 
-export default AgentRoom;
+export default AgentRoomView;

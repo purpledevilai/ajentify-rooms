@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 interface MediaStreamVideoProps {
-    stream: MediaStream | null;
+    stream: MediaStream | undefined;
     muted?: boolean;
 }
 
@@ -11,7 +11,7 @@ export const MediaStreamVideo = ({ stream, muted = false }: MediaStreamVideoProp
     useEffect(() => {
         console.log("Setting video stream:", stream);
         if (videoRef.current) {
-            videoRef.current.srcObject = stream;
+            videoRef.current.srcObject = stream || null;
         }
     }, [stream]);
 
@@ -22,7 +22,7 @@ export const MediaStreamVideo = ({ stream, muted = false }: MediaStreamVideoProp
         muted={muted}
         style={{
             width: "100%",
-            height: "auto",
+            height: "100%",
             objectFit: "cover",
             borderRadius: "8px",
         }}
