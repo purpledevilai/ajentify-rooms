@@ -4,6 +4,7 @@ import { RoomConnection } from "../lib/RoomConnection";
 import { PeerConnection } from "../lib/PeerConnection";
 import { JSONRPCPeer } from "../lib/JSONRPCPeer";
 import { monitorMicStream } from "../lib/monitorMediaStreams";
+import { getAccessToken } from "../api/_config/auth";
 
 export class AgentRoomStore {
     roomConnection: RoomConnection | undefined = undefined;
@@ -115,6 +116,7 @@ export class AgentRoomStore {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
+                        "Authorization": await getAccessToken() || ''
                     },
                     body: JSON.stringify({
                         context_id: roomId,

@@ -22,6 +22,7 @@ import {
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 import { getAccessToken } from "../api/_config/auth";
 import { getAgents } from "../api/agent/getAgents";
+import { createContext } from "../api/context/createContext";
 
 // 🔧 Config: List of agents and their IDs
 const AGENTS = [
@@ -86,16 +87,8 @@ function SetRoomId() {
   };
 
   const createContextForAgent = async (agentId: string): Promise<string> => {
-    // ⛏️ Replace this with your real API call
-    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/context`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent_id: agentId }),
-    });
-
-    if (!response.ok) throw new Error("Context creation failed");
-    const data = await response.json();
-    return data.context_id;
+    const context = await createContext({ agent_id: agentId })
+    return context.context_id;
   };
 
   const handleResetRoom = async () => {
