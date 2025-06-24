@@ -24,15 +24,9 @@ import { getAccessToken } from "../api/_config/auth";
 import { getAgents } from "../api/agent/getAgents";
 import { createContext } from "../api/context/createContext";
 
-// 🔧 Config: List of agents and their IDs
-const AGENTS = [
-  { id: "201cdebe-5c29-45b9-ba4c-56d10d9ae84c", name: "Convo-Bot" },
-  { id: "f00db1f4-7545-4c68-be43-450033db5d2d", name: "Shana's Sourdough" },
-];
-
 function SetRoomId() {
   const [roomId, setRoomId] = useState("");
-  const [selectedAgentId, setSelectedAgentId] = useState(AGENTS[0].id);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
   const [isCreatingContext, setIsCreatingContext] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoadingAgents, setIsLoadingAgents] = useState(true);
@@ -58,6 +52,9 @@ function SetRoomId() {
           id: agent.agent_id,
           name: agent.agent_name,
         })));
+        if (agents.length > 0) {
+          setSelectedAgentId(agents[0].agent_id);
+        }
       } catch (error) {
         console.error("Error checking login status", error);
       } finally {
@@ -74,6 +71,10 @@ function SetRoomId() {
   };
 
   const handleJoinAgentRoom = async () => {
+    if (!selectedAgentId) {
+      alert("Please select an agent to create a room.");
+      return;
+    }
     setIsCreatingContext(true);
     try {
       const contextId = await createContextForAgent(selectedAgentId);
