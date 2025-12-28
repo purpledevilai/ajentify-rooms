@@ -23,14 +23,19 @@ import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 import { getAccessToken } from "../api/_config/auth";
 import { getAgents } from "../api/agent/getAgents";
 import { createContext } from "../api/context/createContext";
+import { getJsonDocuments } from "../api/jsondocument/getJsonDocuments";
+import { JsonDocument } from "../api/_types/jsondocument";
 
 function SetRoomId() {
   const [roomId, setRoomId] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
+  const [selectedMemoryDocumentId, setSelectedMemoryDocumentId] = useState<string | undefined>(undefined);
   const [isCreatingContext, setIsCreatingContext] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoadingAgents, setIsLoadingAgents] = useState(true);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
+  const [jsonDocuments, setJsonDocuments] = useState<JsonDocument[]>([]);
 
   const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
@@ -46,8 +51,15 @@ function SetRoomId() {
           return;
         }
         setIsLoggedIn(true);
-        setIsLoadingAgents(true)
-        const agents = await getAgents();
+        setIsLoadingAgents(true);
+        setIsLoadingDocuments(true);
+        
+        // Load agents and JSON documents in parallel
+        const [agents, documents] = await Promise.all([
+          getAgents(),
+          getJsonDocuments()
+        ]);
+        
         setAgents(agents.map(agent => ({
           id: agent.agent_id,
           name: agent.agent_name,
@@ -55,10 +67,13 @@ function SetRoomId() {
         if (agents.length > 0) {
           setSelectedAgentId(agents[0].agent_id);
         }
+        
+        setJsonDocuments(documents);
       } catch (error) {
         console.error("Error checking login status", error);
       } finally {
         setIsLoadingAgents(false);
+        setIsLoadingDocuments(false);
       }
     }
     checkLoginStatus();
@@ -77,7 +92,7 @@ function SetRoomId() {
     }
     setIsCreatingContext(true);
     try {
-      const contextId = await createContextForAgent(selectedAgentId);
+      const contextId = await createContextForAgent(selectedAgentId, selectedMemoryDocumentId);
       navigate(`/agent-room/${contextId}`);
     } catch (error) {
       console.error("Failed to create context", error);
@@ -87,8 +102,20 @@ function SetRoomId() {
     }
   };
 
-  const createContextForAgent = async (agentId: string): Promise<string> => {
-    const context = await createContext({ agent_id: agentId })
+  const createContextForAgent = async (agentId: string, memoryDocumentId?: string): Promise<string> => {
+    const initializeTools = memoryDocumentId ? [
+      {
+        tool_id: "open_memory_window",
+        tool_input: {
+          document_id: memoryDocumentId
+        }
+      }
+    ] : undefined;
+    
+    const context = await createContext({ 
+      agent_id: agentId,
+      initialize_tools: initializeTools
+    });
     return context.context_id;
   };
 
@@ -177,6 +204,24 @@ function SetRoomId() {
                     {agents.map((agent) => (
                       <option key={agent.id} value={agent.id}>
                         {agent.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                {isLoadingDocuments ? (
+                  <Text fontSize="sm" textAlign="center" color="gray.500" mb={4}>
+                    Loading memory documents...
+                  </Text>
+                ) : (
+                  <Select
+                    mb={4}
+                    value={selectedMemoryDocumentId || ""}
+                    onChange={(e) => setSelectedMemoryDocumentId(e.target.value || undefined)}
+                    placeholder="Select memory document (optional)"
+                  >
+                    {jsonDocuments.map((doc) => (
+                      <option key={doc.document_id} value={doc.document_id}>
+                        {doc.name}
                       </option>
                     ))}
                   </Select>
