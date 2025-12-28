@@ -25,6 +25,7 @@ import { getAgents } from "../api/agent/getAgents";
 import { createContext } from "../api/context/createContext";
 import { getJsonDocuments } from "../api/jsondocument/getJsonDocuments";
 import { JsonDocument } from "../api/_types/jsondocument";
+import { signOut } from "../api/auth/signOut";
 
 function SetRoomId() {
   const [roomId, setRoomId] = useState("");
@@ -133,6 +134,20 @@ function SetRoomId() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setIsLoggedIn(false);
+      setAgents([]);
+      setJsonDocuments([]);
+      setSelectedAgentId(undefined);
+      setSelectedMemoryDocumentId(undefined);
+    } catch (error) {
+      console.error("Error signing out", error);
+      alert("Failed to sign out.");
+    }
+  };
+
   const bg = useColorModeValue("gray.100", "gray.800");
   const inputBg = useColorModeValue("white", "gray.700");
   const inputBorder = useColorModeValue("gray.300", "gray.600");
@@ -150,6 +165,20 @@ function SetRoomId() {
         onClick={toggleColorMode}
         variant="ghost"
       />
+
+      {/* Logout Button */}
+      {isLoggedIn && (
+        <Button
+          position="absolute"
+          top="16px"
+          right="16px"
+          onClick={handleLogout}
+          variant="ghost"
+          size="sm"
+        >
+          Logout
+        </Button>
+      )}
 
       {/* Main Content */}
       <Flex direction="column" align="center" justify="center" height="100%" width="100%">
